@@ -38,7 +38,9 @@ class Settings(BaseSettings):
 
     @property
     def resolved_database_url(self) -> str:
-        if self.database_url and "localhost" not in self.database_url:
+        # Si DATABASE_URL está definido, usarlo tal cual (CI/Docker suelen usar localhost).
+        # Solo se construye la URL de Supabase cuando DATABASE_URL no está configurado.
+        if self.database_url:
             return self.database_url
 
         if not self.database_password or not self.supabase_project_ref:
