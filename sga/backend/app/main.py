@@ -1,0 +1,53 @@
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.api.v1.router import api_router
+from app.core.config import get_settings
+from app.core.database import lifespan
+from app.core.exceptions import (
+    ConflictError,
+    DomainError,
+    ForbiddenError,
+    NotFoundError,
+    UnauthorizedError,
+    ValidationError,
+)
+
+settings = get_settings()
+
+app = FastAPI(
+    title="SGA — Sistema de Gestion Academica",
+    description="API Fase 1: Auth, Tenant, Usuarios (Leonardo Chavez Miranda)",
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(DomainError)
+async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
+    status_map = {
+        ValidationError: 400,
+        UnauthorizedError: 401,
+        ForbiddenError: 403,
+        NotFoundError: 404,
+        ConflictError: 409,
+    }
+    status_code = status_map.get(type(exc), 400)
+    return JSONResponse(status_code=status_code, content={"detail": exc.message})
+
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+app.include_router(api_router)
