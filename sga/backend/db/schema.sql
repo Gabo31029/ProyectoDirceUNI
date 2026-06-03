@@ -125,3 +125,177 @@ VALUES (
     'uni-demo',
     'America/Lima'
 );
+
+-- SGA Fase 1: Periodos Académicos y Políticas (Dair Ramos)
+CREATE TABLE periodo_academico (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
+    nombre_periodo VARCHAR(20) NOT NULL,
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'CONFIGURACION'
+        CHECK (estado IN ('CONFIGURACION', 'MATRICULA', 'REGISTRO_NOTAS', 'CERRADO')),
+    fecha_estado_actual TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    id_usuario_transicion UUID REFERENCES usuarios (id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_periodo_nombre_por_tenant UNIQUE (id_tenant, nombre_periodo),
+    CONSTRAINT chk_periodo_fechas CHECK (fecha_inicio < fecha_fin)
+);
+
+CREATE UNIQUE INDEX uq_periodo_activo_por_tenant ON periodo_academico (id_tenant)
+WHERE estado IN ('MATRICULA', 'REGISTRO_NOTAS');
+
+CREATE TABLE politica_credito (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_periodo UUID NOT NULL REFERENCES periodo_academico (id) ON DELETE RESTRICT,
+    ppa_minimo NUMERIC(5, 2) NOT NULL,
+    ppa_maximo NUMERIC(5, 2) NOT NULL,
+    creditos_maximos SMALLINT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_politica_credito_ppa CHECK (ppa_minimo < ppa_maximo),
+    CONSTRAINT chk_politica_credito_max CHECK (creditos_maximos > 0)
+);
+
+CREATE TABLE politica_condicion_academica (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_periodo UUID NOT NULL REFERENCES periodo_academico (id) ON DELETE RESTRICT,
+    id_tipo_condicion UUID NOT NULL REFERENCES cat_tipo_condicion (id) ON DELETE RESTRICT,
+    cuenta_evaluada VARCHAR(50) NOT NULL,
+    umbral NUMERIC(8, 2) NOT NULL,
+    operador VARCHAR(20) NOT NULL
+        CHECK (operador IN ('MAYOR_QUE', 'MAYOR_IGUAL', 'IGUAL', 'MENOR_IGUAL', 'MENOR_QUE')),
+    accion_resultante VARCHAR(100) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_politica_condicion_periodo UNIQUE (id_periodo, id_tipo_condicion)
+);
+
+CREATE TABLE politica_retiro (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_periodo UUID NOT NULL REFERENCES periodo_academico (id) ON DELETE RESTRICT,
+    tipo_retiro VARCHAR(50) NOT NULL,
+    semana_limite SMALLINT NOT NULL CHECK (semana_limite > 0),
+    condiciones_bloqueantes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE politica_reserva (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_periodo UUID NOT NULL UNIQUE REFERENCES periodo_academico (id) ON DELETE RESTRICT,
+    max_periodos_consecutivos SMALLINT NOT NULL,
+    max_periodos_alternos SMALLINT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE formula_promedio (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_periodo UUID NOT NULL REFERENCES periodo_academico (id) ON DELETE RESTRICT,
+    tipo_promedio VARCHAR(10) NOT NULL CHECK (tipo_promedio IN ('PPS', 'PPA')),
+    expresion_calculo TEXT NOT NULL,
+    regla_inclusion VARCHAR(30) NOT NULL
+        CHECK (regla_inclusion IN ('TODOS', 'ULTIMO', 'SOLO_APROBADOS')),
+    version_formula VARCHAR(20) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_formula_promedio_periodo UNIQUE (id_periodo, tipo_promedio)
+);
+
+CREATE TABLE politica_dispersion (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_periodo UUID NOT NULL UNIQUE REFERENCES periodo_academico (id) ON DELETE RESTRICT,
+    ciclos_max_dispersion SMALLINT NOT NULL,
+    prioridad_ciclo_atrasado BOOLEAN NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- SGA Fase 1: Oferta Académica (Dair Ramos)
+CREATE TABLE plan_estudios (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
+    carrera VARCHAR(200) NOT NULL,
+    version_plan VARCHAR(20) NOT NULL,
+    creditos_totales SMALLINT NOT NULL CHECK (creditos_totales > 0),
+    estado VARCHAR(10) NOT NULL DEFAULT 'BORRADOR'
+        CHECK (estado IN ('BORRADOR', 'ACTIVO')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_plan_estudios_version UNIQUE (id_tenant, carrera, version_plan)
+);
+
+CREATE TABLE curso (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
+    codigo_curso VARCHAR(20) NOT NULL,
+    nombre_curso VARCHAR(200) NOT NULL,
+    creditos SMALLINT NOT NULL CHECK (creditos > 0),
+    tipo_curso VARCHAR(15) NOT NULL
+        CHECK (tipo_curso IN ('OBLIGATORIO', 'ELECTIVO')),
+    ciclo_sugerido SMALLINT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_curso_codigo UNIQUE (id_tenant, codigo_curso)
+);
+
+CREATE TABLE plan_estudios_curso (
+    id_plan_estudios UUID NOT NULL REFERENCES plan_estudios (id) ON DELETE RESTRICT,
+    id_curso UUID NOT NULL REFERENCES curso (id) ON DELETE RESTRICT,
+    ciclo_en_plan SMALLINT NOT NULL,
+    es_obligatorio BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (id_plan_estudios, id_curso)
+);
+
+CREATE TABLE prerrequisito (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_curso UUID NOT NULL REFERENCES curso (id) ON DELETE RESTRICT,
+    id_curso_requerido UUID REFERENCES curso (id) ON DELETE RESTRICT,
+    tipo_prereq VARCHAR(20) NOT NULL
+        CHECK (tipo_prereq IN ('APROBACION_CURSO', 'MINIMO_CREDITOS')),
+    valor_min_creditos SMALLINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_prerrequisito_auto Check (id_curso <> id_curso_requerido),
+    CONSTRAINT chk_prerrequisito_campos CHECK (
+        (tipo_prereq = 'APROBACION_CURSO' AND id_curso_requerido IS NOT NULL) OR
+        (tipo_prereq = 'MINIMO_CREDITOS' AND valor_min_creditos IS NOT NULL)
+    )
+);
+
+CREATE TABLE seccion (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
+    id_periodo UUID NOT NULL REFERENCES periodo_academico (id) ON DELETE RESTRICT,
+    id_curso UUID NOT NULL REFERENCES curso (id) ON DELETE RESTRICT,
+    codigo_seccion VARCHAR(10) NOT NULL,
+    vacantes_maximas SMALLINT NOT NULL,
+    vacantes_disponibles SMALLINT NOT NULL,
+    estado VARCHAR(15) NOT NULL DEFAULT 'ABIERTA'
+        CHECK (estado IN ('ABIERTA', 'CERRADA', 'SUSPENDIDA')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_seccion_codigo UNIQUE (id_periodo, id_curso, codigo_seccion),
+    CONSTRAINT chk_seccion_vacantes_disp CHECK (vacantes_disponibles >= 0),
+    CONSTRAINT chk_seccion_vacantes_max CHECK (vacantes_disponibles <= vacantes_maximas)
+);
+
+CREATE TABLE asignacion_docente_seccion (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_seccion UUID NOT NULL REFERENCES seccion (id) ON DELETE RESTRICT,
+    id_usuario_docente UUID NOT NULL REFERENCES usuarios (id) ON DELETE RESTRICT,
+    id_tipo_componente UUID NOT NULL REFERENCES cat_tipo_componente (id) ON DELETE RESTRICT,
+    es_coordinador BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_asignacion_docente_componente UNIQUE (id_seccion, id_usuario_docente, id_tipo_componente)
+);
+
+CREATE TABLE componente_evaluacion (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_seccion UUID NOT NULL REFERENCES seccion (id) ON DELETE RESTRICT,
+    id_tipo_componente UUID NOT NULL REFERENCES cat_tipo_componente (id) ON DELETE RESTRICT,
+    id_escala UUID NOT NULL REFERENCES cat_escala_evaluacion (id) ON DELETE RESTRICT,
+    peso_relativo NUMERIC(5, 2) NOT NULL CHECK (peso_relativo > 0 AND peso_relativo <= 100),
+    orden_presentacion SMALLINT,
+    estado VARCHAR(15) NOT NULL DEFAULT 'BORRADOR'
+        CHECK (estado IN ('BORRADOR', 'PUBLICADO', 'CERRADO')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
