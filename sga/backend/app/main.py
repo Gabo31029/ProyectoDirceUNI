@@ -18,8 +18,11 @@ settings = get_settings()
 
 app = FastAPI(
     title="SGA — Sistema de Gestion Academica",
-    description="API Fase 1: Auth, Tenant, Usuarios (Leonardo Chavez Miranda)",
-    version="0.1.0",
+    description=(
+        "API SGA: Auth/Tenant/Usuarios, Periodos/Oferta, Matricula "
+        "(Grupo 4 — Dirce)"
+    ),
+    version="0.2.0",
     lifespan=lifespan,
 )
 
