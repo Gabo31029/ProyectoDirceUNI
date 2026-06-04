@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./sga/backend
+      dockerfile: Dockerfile
+    container_name: sga_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./sga/backend/.env
+    volumes:
+      - ./sga/backend:/app
+    # Con reload habilitado, si modificas un archivo en ./sga/backend, se reinicia uvicorn en el contenedor
+    restart: unless-stopped
+    # Dependencias: Si tuvieras postgres local, lo agregarías aquí. 
+    # Como usas Supabase externo, no necesitas un contenedor de DB.
