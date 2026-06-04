@@ -1,0 +1,16 @@
+meta {
+  name: 05 Cerrar Periodo
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/cierre/periodos/{{id_periodo}}/cerrar
+  body: none
+  auth: none
+}
+
+headers {
+  X-User-Role: ADMINISTRADOR
+  X-User-ID: {{id_admin}}
+}

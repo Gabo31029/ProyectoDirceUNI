@@ -1,0 +1,34 @@
+meta {
+  name: POST inscribir curso
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/matriculas/{{matricula_id}}/inscripciones
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id_seccion": "{{id_seccion}}"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("inscripcion_id", res.body.id);
+}
+
+tests {
+  test("status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("json.estado is ACTIVA", function() {
+    expect(res.body.estado).to.equal("ACTIVA");
+  });
+}

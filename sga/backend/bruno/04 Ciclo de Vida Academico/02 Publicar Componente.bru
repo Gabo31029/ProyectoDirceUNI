@@ -1,0 +1,16 @@
+meta {
+  name: 02 Publicar Componente
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/calificaciones/secciones/{{id_seccion}}/componentes/{{id_componente}}/publicar
+  body: none
+  auth: none
+}
+
+headers {
+  X-User-Role: DOCENTE
+  X-User-ID: {{id_docente}}
+}

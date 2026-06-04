@@ -1,0 +1,32 @@
+meta {
+  name: 01 Registrar Calificaciones
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/calificaciones/secciones/{{id_seccion}}/componentes/{{id_componente}}
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-User-Role: DOCENTE
+  X-User-ID: {{id_docente}}
+}
+
+body:json {
+  {
+    "calificaciones": [
+      {
+        "id_inscripcion": "{{id_inscripcion_1}}",
+        "valor_nota": 18.5
+      },
+      {
+        "id_inscripcion": "{{id_inscripcion_2}}",
+        "valor_nota": 14.0
+      }
+    ]
+  }
+}

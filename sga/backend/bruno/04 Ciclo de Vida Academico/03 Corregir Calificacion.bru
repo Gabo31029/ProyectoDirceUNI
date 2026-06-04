@@ -1,0 +1,24 @@
+meta {
+  name: 03 Corregir Calificacion
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/calificaciones/{{id_calificacion}}/corregir
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  X-User-Role: ADMINISTRADOR
+  X-User-ID: {{id_admin}}
+}
+
+body:json {
+  {
+    "valor_nuevo": 20.0,
+    "justificacion": "Error de tipeo en el registro original del docente."
+  }
+}
