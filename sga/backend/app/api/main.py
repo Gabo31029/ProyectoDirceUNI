@@ -23,10 +23,19 @@ app = FastAPI(
     contact={"name": "Grupo 4 – SW505 2026-1"}
 )
 
+import os
+
+# Read allowed origins from environment (comma-separated), default to "*" if not specified
+origins_str = os.getenv("ALLOWED_ORIGINS", "*")
+if origins_str == "*":
+    origins = ["*"]
+else:
+    origins = [origin.strip() for origin in origins_str.split(",") if origin.strip()]
+
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
