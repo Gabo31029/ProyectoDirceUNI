@@ -1,0 +1,9 @@
+# Secretos locales - no commitear
+.env
+.env.local
+.env.*.local
+
+# Python cache en este subproyecto
+__pycache__/
+*.py[cod]
+.pytest_cache/

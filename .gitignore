@@ -4,6 +4,11 @@ __pycache__/
 *$py.class
 *.so
 *.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
 
 # Virtual environments
 .venv/
@@ -11,31 +16,42 @@ venv/
 env/
 ENV/
 
-# Distribution / packaging
-*.egg-info/
-dist/
-build/
-*.egg
-MANIFEST
-
-# Environment variables
-.env
-.env.*
-!.env.example
-
-# Pytest
+# Tests / coverage
 .pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
 *.pyc
 
-# IDEs
+# Environment variables (NEVER commit secrets)
+.env
+**/.env
+.env.local
+**/.env.local
+.env.*.local
+**/.env.*.local
+.env.*
+!.env.example
+!**/.env.example
+
+# Frontend (other members)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Docker (local data, not code)
+**/pgdata/
+
+# IDEs / OS
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Logs
 *.log

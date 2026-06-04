@@ -1,0 +1,51 @@
+name: Backend Tests
+
+on:
+  push:
+    paths:
+      - "sga/backend/**"
+  pull_request:
+    paths:
+      - "sga/backend/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: sga
+          POSTGRES_PASSWORD: sga_dev
+          POSTGRES_DB: sga
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: sga/backend
+        run: pip install -r requirements.txt
+
+      - name: Apply schema
+        env:
+          PGPASSWORD: sga_dev
+        run: psql -h localhost -U sga -d sga -f sga/backend/db/schema.sql
+
+      - name: Run tests
+        working-directory: sga/backend
+        env:
+          DATABASE_URL: postgresql://sga:sga_dev@localhost:5432/sga
+          RUN_INTEGRATION_TESTS: "1"
+          JWT_SECRET_KEY: ci-secret-key-for-tests-minimum-32-chars
+        run: python -m pytest -v
