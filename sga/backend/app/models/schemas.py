@@ -361,3 +361,62 @@ class ComponenteEvaluacionResponse(BaseModel):
     estado: ComponenteEstado
     created_at: datetime
     updated_at: datetime
+
+
+# --- Matricula e Inscripciones (Luis Gabriel Eustaquio Avila) ---
+
+
+class MatriculaEstado(str, Enum):
+    ACTIVA = "ACTIVA"
+    RETIRADA = "RETIRADA"
+    FINALIZADA = "FINALIZADA"
+
+
+class InscripcionEstado(str, Enum):
+    ACTIVA = "ACTIVA"
+    RETIRADA = "RETIRADA"
+    APROBADA = "APROBADA"
+    DESAPROBADA = "DESAPROBADA"
+    ANULADA = "ANULADA"
+
+
+class MatriculaCreate(BaseModel):
+    id_periodo: UUID
+    id_alumno: UUID | None = Field(
+        default=None,
+        description="Solo ADMIN. Si es ALUMNO, se usa el usuario autenticado.",
+    )
+
+
+class MatriculaResponse(BaseModel):
+    id: UUID
+    id_tenant: UUID
+    id_alumno: UUID
+    id_periodo: UUID
+    estado: MatriculaEstado
+    creditos_matriculados: int
+    fecha_matricula: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class InscripcionCreate(BaseModel):
+    id_seccion: UUID
+
+
+class InscripcionResponse(BaseModel):
+    id: UUID
+    id_tenant: UUID
+    id_matricula: UUID
+    id_seccion: UUID
+    id_curso: UUID
+    estado: InscripcionEstado
+    creditos: int
+    fecha_inscripcion: datetime
+    fecha_retiro: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RetiroRequest(BaseModel):
+    motivo: str | None = Field(default=None, max_length=500)
