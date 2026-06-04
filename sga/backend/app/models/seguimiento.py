@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -14,8 +14,8 @@ class CuentaSeguimientoAlumno(Base):
     id_periodo_ref = Column(String(36), ForeignKey("periodo_academico.id_periodo", ondelete="RESTRICT"), nullable=True)
     id_curso_ref = Column(String(36), ForeignKey("curso.id_curso", ondelete="RESTRICT"), nullable=True)
     valor_actual = Column(Numeric(10, 2), nullable=False, default=0)
-    fecha_actualizacion = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_actualizacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     perfil_alumno = relationship("PerfilAlumno", backref="cuentas_seguimiento")
     tenant = relationship("Tenant", backref="cuentas_seguimiento")
@@ -47,11 +47,11 @@ class EventoAcademico(Base):
     id_actor = Column(String(36), ForeignKey("usuario.id_usuario", ondelete="RESTRICT"), nullable=False)
     entidad_afectada_tipo = Column(String(50), nullable=False)
     entidad_afectada_id = Column(String(36), nullable=False)
-    fecha_ocurrencia = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_ocurrencia = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     valor_anterior = Column(String(1000), nullable=True)  # JSON serialized string
     valor_nuevo = Column(String(1000), nullable=True)     # JSON serialized string
     id_evento_ref = Column(String(36), ForeignKey("evento_academico.id_evento", ondelete="RESTRICT"), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     tenant = relationship("Tenant", backref="eventos_academicos")
     tipo_evento = relationship("TipoEvento", backref="eventos_generados")
@@ -64,7 +64,7 @@ class RegistroAuditoria(Base):
     id_registro = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     id_tenant = Column(String(36), ForeignKey("tenants.id_tenant", ondelete="RESTRICT"), nullable=False)
     id_usuario = Column(String(36), ForeignKey("usuario.id_usuario", ondelete="RESTRICT"), nullable=False)
-    fecha_hora = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_hora = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     tipo_operacion = Column(String(80), nullable=False)
     entidad_afectada_tipo = Column(String(50), nullable=False)
     entidad_afectada_id = Column(String(36), nullable=False)
@@ -72,7 +72,7 @@ class RegistroAuditoria(Base):
     valor_anterior = Column(String(1000), nullable=True)
     valor_nuevo = Column(String(1000), nullable=True)
     motivo_rechazo = Column(String(1000), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     tenant = relationship("Tenant", backref="registros_auditoria")
     usuario = relationship("Usuario", backref="registros_auditoria")

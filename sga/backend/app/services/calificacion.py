@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -109,7 +109,7 @@ def registrar_calificaciones(
             if calif:
                 calif.valor_nota = nota_val
                 calif.id_docente_ingreso = user.id_perfil or "mock-docente-id"
-                calif.fecha_ingreso = datetime.utcnow()
+                calif.fecha_ingreso = datetime.now(timezone.utc)
                 db.add(calif)
             else:
                 calif_data = {

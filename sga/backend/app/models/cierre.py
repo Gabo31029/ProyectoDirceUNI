@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Numeric, DateTime, ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -14,7 +14,7 @@ class FormulaPromedio(Base):
     expresion_calculo = Column(String(500), nullable=False)
     regla_inclusion = Column(String(30), nullable=False)  # TODOS, ULTIMO, SOLO_APROBADOS
     version_formula = Column(String(20), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     periodo = relationship("PeriodoAcademico", backref="formulas_promedio")
 
@@ -35,10 +35,10 @@ class SnapshotPromedio(Base):
     pps = Column(Numeric(5, 2), nullable=False)
     ppa = Column(Numeric(5, 2), nullable=False)
     id_formula_aplicada = Column(String(36), ForeignKey("formula_promedio.id_formula", ondelete="RESTRICT"), nullable=True)
-    fecha_generacion = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_generacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     id_snapshot_anterior = Column(String(36), ForeignKey("snapshot_promedio.id_snapshot", ondelete="RESTRICT"), nullable=True)
     id_evento_correc = Column(String(36), ForeignKey("evento_academico.id_evento", ondelete="RESTRICT"), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     perfil_alumno = relationship("PerfilAlumno", backref="snapshots_promedio")
     periodo = relationship("PeriodoAcademico", backref="snapshots_promedio")
@@ -60,11 +60,11 @@ class CondicionAcademicaAlumno(Base):
     id_periodo = Column(String(36), ForeignKey("periodo_academico.id_periodo", ondelete="RESTRICT"), nullable=False)
     id_evento_origen = Column(String(36), ForeignKey("evento_academico.id_evento", ondelete="RESTRICT"), nullable=False)
     estado = Column(String(10), nullable=False, default="ACTIVA")  # ACTIVA, RESUELTA
-    fecha_activacion = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_activacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     fecha_resolucion = Column(DateTime(timezone=True), nullable=True)
     observaciones = Column(String(1000), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     perfil_alumno = relationship("PerfilAlumno", backref="condiciones_academicas")
     tipo_condicion = relationship("TipoCondicionAcademica", backref="alumnos_afectados")
@@ -89,7 +89,7 @@ class PoliticaCondicionAcademica(Base):
     umbral = Column(Numeric(8, 2), nullable=False)
     operador = Column(String(20), nullable=False)  # MAYOR_QUE, MAYOR_IGUAL, IGUAL, MENOR_IGUAL, MENOR_QUE
     accion_resultante = Column(String(100), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     periodo = relationship("PeriodoAcademico", backref="politicas_condicion")
     tipo_condicion = relationship("TipoCondicionAcademica", backref="politicas")

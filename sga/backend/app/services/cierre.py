@@ -1,6 +1,6 @@
 from typing import List
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -167,7 +167,7 @@ def cerrar_acta_seccion(
                     id_curso_ref=id_curso
                 )
 
-            ins.fecha_cambio_estado = datetime.utcnow()
+            ins.fecha_cambio_estado = datetime.now(timezone.utc)
             db.add(ins)
 
         # 7. Close all components
@@ -257,7 +257,7 @@ def cerrar_periodo_academico(
 
     # 3. Transition period state to CERRADO
     periodo.estado = "CERRADO"
-    periodo.fecha_estado_actual = datetime.utcnow()
+    periodo.fecha_estado_actual = datetime.now(timezone.utc)
     periodo.id_usuario_transicion = user.id_usuario
     db.add(periodo)
     db.flush()
@@ -410,7 +410,7 @@ def cerrar_periodo_academico(
                             id_periodo=id_periodo,
                             id_evento_origen=event_cond.id_evento,
                             estado="ACTIVA",
-                            fecha_activacion=datetime.utcnow(),
+                            fecha_activacion=datetime.now(timezone.utc),
                             observaciones="Activada automáticamente por política de cierre académico."
                         )
                         db.add(new_cond)
@@ -424,7 +424,7 @@ def cerrar_periodo_academico(
                     for ac in active_conditions:
                         if ac.id_tipo_condicion == pol.id_tipo_condicion:
                             ac.estado = "RESUELTA"
-                            ac.fecha_resolucion = datetime.utcnow()
+                            ac.fecha_resolucion = datetime.now(timezone.utc)
                             db.add(ac)
                             create_academic_event(
                                 db=db,

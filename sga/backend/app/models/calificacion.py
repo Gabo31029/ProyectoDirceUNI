@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Integer, Numeric, DateTime, ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -14,8 +14,8 @@ class ComponenteEvaluacion(Base):
     peso_relativo = Column(Numeric(5, 2), nullable=False)
     orden_presentacion = Column(Integer, nullable=True)
     estado = Column(String(15), nullable=False, default="BORRADOR")  # BORRADOR, PUBLICADO, CERRADO
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     seccion = relationship("Seccion", backref="componentes_evaluacion")
     tipo_componente = relationship("TipoComponente", backref="componentes_evaluacion")
@@ -34,10 +34,10 @@ class Calificacion(Base):
     id_componente = Column(String(36), ForeignKey("componente_evaluacion.id_componente", ondelete="RESTRICT"), nullable=False)
     valor_nota = Column(Numeric(5, 2), nullable=False)
     estado = Column(String(15), nullable=False, default="BORRADOR")  # BORRADOR, PUBLICADO
-    fecha_ingreso = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_ingreso = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     id_docente_ingreso = Column(String(36), ForeignKey("perfil_docente.id_perfil_docente", ondelete="RESTRICT"), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     inscripcion = relationship("Inscripcion", backref="calificaciones")
     componente = relationship("ComponenteEvaluacion", backref="calificaciones")
@@ -60,8 +60,8 @@ class CorreccionNota(Base):
     valor_nuevo = Column(Numeric(5, 2), nullable=False)
     justificacion = Column(String(1000), nullable=False)
     id_admin_aprobador = Column(String(36), ForeignKey("usuario.id_usuario", ondelete="RESTRICT"), nullable=False)
-    fecha_correccion = Column(DateTime(timezone=True), default=datetime.utcnow)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_correccion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     calificacion = relationship("Calificacion", backref="correcciones")
     admin_aprobador = relationship("Usuario", backref="correcciones_aprobadas")

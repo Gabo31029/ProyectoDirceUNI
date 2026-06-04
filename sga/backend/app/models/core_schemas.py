@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from sqlalchemy import Column, String, Boolean, Integer, Numeric, Date, DateTime, ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -12,9 +12,9 @@ class Tenant(Base):
     dominio = Column(String(100), unique=True, nullable=False)
     zona_horaria = Column(String(60), nullable=False, default="America/Lima")
     estado = Column(String(10), nullable=False, default="ACTIVO")  # ACTIVO, INACTIVO
-    fecha_registro = Column(DateTime(timezone=True), default=datetime.utcnow)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    fecha_registro = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         CheckConstraint("estado IN ('ACTIVO', 'INACTIVO')", name="chk_tenant_estado"),
@@ -29,8 +29,8 @@ class EscalaEvaluacion(Base):
     nota_minima = Column(Numeric(5, 2), nullable=False)
     nota_maxima = Column(Numeric(5, 2), nullable=False)
     nota_aprobatoria = Column(Numeric(5, 2), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("id_tenant", name="uq_escala_tenant"),
@@ -45,7 +45,7 @@ class TipoComponente(Base):
     codigo = Column(String(20), nullable=False)
     nombre = Column(String(100), nullable=False)
     activo = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("id_tenant", "codigo", name="uq_tipo_componente_codigo"),
@@ -59,7 +59,7 @@ class TipoCondicionAcademica(Base):
     codigo = Column(String(30), nullable=False)
     nombre = Column(String(100), nullable=False)
     descripcion = Column(String(500), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("id_tenant", "codigo", name="uq_tipo_condicion_codigo"),
@@ -74,7 +74,7 @@ class TipoEvento(Base):
     nombre = Column(String(150), nullable=False)
     cuenta_objetivo = Column(String(50), nullable=False)
     operacion = Column(String(20), nullable=False)  # INCREMENTO, DECREMENTO, ASIGNACION
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("id_tenant", "codigo", name="uq_tipo_evento_codigo"),
@@ -91,9 +91,9 @@ class Usuario(Base):
     password_hash = Column(String(255), nullable=False)
     rol = Column(String(30), nullable=False)  # ADMINISTRADOR_CENTRAL, ADMINISTRADOR, DOCENTE, ALUMNO
     estado = Column(String(10), nullable=False, default="ACTIVO")  # ACTIVO, INACTIVO
-    fecha_registro = Column(DateTime(timezone=True), default=datetime.utcnow)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    fecha_registro = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("id_tenant", "email", name="uq_usuario_email"),
@@ -110,8 +110,8 @@ class PlanEstudios(Base):
     version_plan = Column(String(20), nullable=False)
     creditos_totales = Column(Integer, nullable=False)
     estado = Column(String(10), nullable=False, default="BORRADOR")  # BORRADOR, ACTIVO
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("id_tenant", "carrera", "version_plan", name="uq_plan_estudios_version"),
@@ -129,8 +129,8 @@ class PerfilAlumno(Base):
     carrera = Column(String(200), nullable=False)
     ciclo_actual = Column(Integer, nullable=True)
     periodo_ingreso = Column(String(20), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     usuario = relationship("Usuario", backref="perfil_alumno")
     plan_estudios = relationship("PlanEstudios", backref="perfiles_alumno")
@@ -142,8 +142,8 @@ class PerfilDocente(Base):
     id_usuario = Column(String(36), ForeignKey("usuario.id_usuario", ondelete="RESTRICT"), unique=True, nullable=False)
     codigo_docente = Column(String(20), nullable=False)
     especialidad = Column(String(200), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     usuario = relationship("Usuario", backref="perfil_docente")
 
@@ -156,10 +156,10 @@ class PeriodoAcademico(Base):
     fecha_inicio = Column(Date, nullable=False)
     fecha_fin = Column(Date, nullable=False)
     estado = Column(String(20), nullable=False, default="CONFIGURACION")  # CONFIGURACION, MATRICULA, REGISTRO_NOTAS, CERRADO
-    fecha_estado_actual = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_estado_actual = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     id_usuario_transicion = Column(String(36), ForeignKey("usuario.id_usuario", ondelete="SET NULL"), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("id_tenant", "nombre_periodo", name="uq_periodo_nombre"),
@@ -178,8 +178,8 @@ class Curso(Base):
     tipo_curso = Column(String(15), nullable=False)  # OBLIGATORIO, ELECTIVO
     ciclo_sugerido = Column(Integer, nullable=True)
     activo = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
         UniqueConstraint("id_tenant", "codigo_curso", name="uq_curso_codigo"),
@@ -198,8 +198,8 @@ class Seccion(Base):
     vacantes_maximas = Column(Integer, nullable=False)
     vacantes_disponibles = Column(Integer, nullable=False)
     estado = Column(String(15), nullable=False, default="ABIERTA")  # ABIERTA, CERRADA, SUSPENDIDA
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     curso = relationship("Curso", backref="secciones")
     periodo = relationship("PeriodoAcademico", backref="secciones")
@@ -219,7 +219,7 @@ class AsignacionDocenteSeccion(Base):
     id_perfil_docente = Column(String(36), ForeignKey("perfil_docente.id_perfil_docente", ondelete="RESTRICT"), nullable=False)
     id_tipo_componente = Column(String(36), ForeignKey("tipo_componente.id_tipo_componente", ondelete="RESTRICT"), nullable=False)
     es_coordinador = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     seccion = relationship("Seccion", backref="asignaciones_docente")
     perfil_docente = relationship("PerfilDocente", backref="asignaciones_seccion")
@@ -235,11 +235,11 @@ class Matricula(Base):
     id_matricula = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     id_perfil_alumno = Column(String(36), ForeignKey("perfil_alumno.id_perfil_alumno", ondelete="RESTRICT"), nullable=False)
     id_periodo = Column(String(36), ForeignKey("periodo_academico.id_periodo", ondelete="RESTRICT"), nullable=False)
-    fecha_registro = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_registro = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     estado = Column(String(15), nullable=False, default="ACTIVA")  # ACTIVA, RESERVADA, ANULADA
     numero_constancia = Column(String(50), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     perfil_alumno = relationship("PerfilAlumno", backref="matriculas")
     periodo = relationship("PeriodoAcademico", backref="matriculas")
@@ -256,11 +256,11 @@ class Inscripcion(Base):
     id_matricula = Column(String(36), ForeignKey("matricula.id_matricula", ondelete="RESTRICT"), nullable=False)
     id_seccion = Column(String(36), ForeignKey("seccion.id_seccion", ondelete="RESTRICT"), nullable=False)
     estado = Column(String(15), nullable=False, default="ACTIVA")  # ACTIVA, RETIRADA, APROBADA, DESAPROBADA, ANULADA
-    fecha_inscripcion = Column(DateTime(timezone=True), default=datetime.utcnow)
+    fecha_inscripcion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     fecha_cambio_estado = Column(DateTime(timezone=True), nullable=True)
     nota_final = Column(Numeric(5, 2), nullable=True)
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     matricula = relationship("Matricula", backref="inscripciones")
     seccion = relationship("Seccion", backref="inscripciones")
