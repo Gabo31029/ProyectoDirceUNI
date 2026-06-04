@@ -1,0 +1,55 @@
+[
+  {
+    "_id": "c1111111-1111-1111-1111-111111111111",
+    "colName": "SGA — Matrícula (integral)",
+    "created": "2026-06-03T12:00:00.000Z",
+    "sortNum": 10000,
+    "folders": [
+      {
+        "_id": "f1111111-1111-1111-1111-111111111101",
+        "name": "00 Setup",
+        "containerId": "",
+        "created": "2026-06-03T12:00:00.000Z",
+        "sortNum": 10000
+      },
+      {
+        "_id": "f1111111-1111-1111-1111-111111111102",
+        "name": "01 Flujo feliz (ALUMNO)",
+        "containerId": "",
+        "created": "2026-06-03T12:00:00.000Z",
+        "sortNum": 20000,
+        "settings": {
+          "headers": [
+            { "name": "Authorization", "value": "Bearer {{access_token}}" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        }
+      },
+      {
+        "_id": "f1111111-1111-1111-1111-111111111103",
+        "name": "02 Admin (matrícula por alumno)",
+        "containerId": "",
+        "created": "2026-06-03T12:00:00.000Z",
+        "sortNum": 30000,
+        "settings": {
+          "headers": [
+            { "name": "Authorization", "value": "Bearer {{access_token}}" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        }
+      },
+      {
+        "_id": "f1111111-1111-1111-1111-111111111104",
+        "name": "03 Errores esperados",
+        "containerId": "",
+        "created": "2026-06-03T12:00:00.000Z",
+        "sortNum": 40000
+      }
+    ],
+    "settings": {
+      "options": {
+        "baseUrl": "{{baseUrl}}"
+      }
+    }
+  }
+]
