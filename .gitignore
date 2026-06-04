@@ -27,9 +27,8 @@ build/
 .env.*
 !.env.example
 
-# Bruno environments contain secrets (passwords, tokens) - ignored
-# The collection files (.bru) ARE tracked so teammates can use them
-**/bruno/environments/
+# Bruno collection (.bru files) are tracked so teammates can use them
+# environments/ is also tracked since it only contains demo data (real secrets are in .env)
 
 # ============================================================
 # IDE & Editor
