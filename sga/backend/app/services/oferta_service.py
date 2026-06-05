@@ -305,7 +305,7 @@ class OfertaService:
     async def asignar_docente(
         self, tenant_id: UUID, seccion_id: UUID, payload: AsignacionDocenteCreate, *, actor_id: UUID
     ) -> AsignacionDocenteResponse:
-        seccion = await self.repo.get_by_id(seccion_id, tenant_id)
+        seccion = await self.repo.get_seccion_by_id(seccion_id, tenant_id)
         if seccion is None:
             raise NotFoundError("Seccion no encontrada.")
 
@@ -347,7 +347,7 @@ class OfertaService:
     async def crear_componente_evaluacion(
         self, tenant_id: UUID, seccion_id: UUID, payload: ComponenteEvaluacionCreate, *, actor_id: UUID
     ) -> ComponenteEvaluacionResponse:
-        seccion = await self.repo.get_by_id(seccion_id, tenant_id)
+        seccion = await self.repo.get_seccion_by_id(seccion_id, tenant_id)
         if seccion is None:
             raise NotFoundError("Seccion no encontrada.")
 
@@ -374,7 +374,7 @@ class OfertaService:
         return _map_componente(row)
 
     async def list_componentes(self, tenant_id: UUID, seccion_id: UUID) -> list[ComponenteEvaluacionResponse]:
-        seccion = await self.repo.get_by_id(seccion_id, tenant_id)
+        seccion = await self.repo.get_seccion_by_id(seccion_id, tenant_id)
         if seccion is None:
             raise NotFoundError("Seccion no encontrada.")
         rows = await self.repo.list_componentes_by_seccion(seccion_id)
