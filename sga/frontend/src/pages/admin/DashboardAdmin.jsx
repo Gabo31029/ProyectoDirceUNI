@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import StatCard from '../../components/StatCard'
 import Badge from '../../components/Badge'
+import Icon from '../../components/Icon'
 import { periodoService } from '../../services/periodoService'
 import { ofertaService } from '../../services/ofertaService'
 import { userService } from '../../services/userService'
@@ -23,7 +24,7 @@ function PhaseTimeline({ estado }) {
         <div key={f} style={{ display: 'flex', alignItems: 'center', flex: i < FASES.length - 1 ? '1' : '0 0 auto' }}>
           <div className="tl-step">
             <div className={`tl-node${i < idx ? ' done' : i === idx ? ' current' : ''}`}>
-              {i < idx ? '✓' : i + 1}
+              {i < idx ? <Icon name="check" size={12} /> : i + 1}
             </div>
             <span className={`tl-lbl${i <= idx ? ' on' : ''}`}>{FASE_LABEL[f]}</span>
           </div>
@@ -64,29 +65,26 @@ export default function DashboardAdmin() {
   return (
     <Layout>
       <div className="page-container">
-        {/* Page head */}
         <div className="page-head">
           <div className="ph-l">
             <h1 className="h1">Panel principal</h1>
-            <p className="ph-sub">Vista general del período académico activo</p>
+            <p className="ph-sub">Estado del período académico y accesos rápidos</p>
           </div>
           <div className="page-actions">
             <button className="btn btn-secondary" onClick={() => navigate('/admin/periodos')}>
-              Gestionar período →
+              Gestionar período
             </button>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="stat-grid" style={{ marginBottom: 24 }}>
-          <StatCard icon="📅" label="Período Activo" value={loading ? '…' : (periodo?.nombre_periodo || 'Ninguno')} colorClass="indigo" />
-          <StatCard icon="📖" label="Secciones Abiertas" value={loading ? '…' : secciones.filter(s => s.estado === 'ABIERTA').length} colorClass="green" />
-          <StatCard icon="👥" label="Usuarios" value={loading ? '…' : usuarios.length} colorClass="blue" />
-          <StatCard icon="🎓" label="Docentes" value={loading ? '…' : usuarios.filter(u => u.rol === 'DOCENTE').length} colorClass="violet" />
+          <StatCard icon={<Icon name="calendar" size={18} />} label="Período Activo" value={loading ? '…' : (periodo?.nombre_periodo || 'Ninguno')} colorClass="indigo" />
+          <StatCard icon={<Icon name="document" size={18} />} label="Secciones Abiertas" value={loading ? '…' : secciones.filter(s => s.estado === 'ABIERTA').length} colorClass="green" />
+          <StatCard icon={<Icon name="users" size={18} />} label="Usuarios" value={loading ? '…' : usuarios.length} colorClass="blue" />
+          <StatCard icon={<Icon name="graduation-cap" size={18} />} label="Docentes" value={loading ? '…' : usuarios.filter(u => u.rol === 'DOCENTE').length} colorClass="violet" />
         </div>
 
         <div className="grid-2">
-          {/* Período activo + timeline */}
           <div className="card card-pad">
             <div className="between" style={{ marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
               <div>
@@ -107,42 +105,33 @@ export default function DashboardAdmin() {
               <PhaseTimeline estado={periodo.estado} />
             ) : (
               <div className="empty">
-                <div className="empty-ic">📅</div>
+                <div className="empty-ic"><Icon name="calendar" size={32} style={{ color: 'var(--ink-4)' }} /></div>
                 <div className="empty-title">Sin período activo</div>
                 <div className="empty-sub">Crea un nuevo período académico para comenzar</div>
               </div>
             )}
           </div>
 
-          {/* Accesos rápidos */}
           <div className="card card-pad">
             <div className="h3" style={{ marginBottom: 14 }}>Accesos rápidos</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { icon: '📅', label: 'Períodos académicos', sub: 'Crear y transicionar períodos', to: '/admin/periodos' },
-                { icon: '📖', label: 'Oferta académica', sub: 'Planes, cursos y secciones', to: '/admin/oferta' },
-                { icon: '👥', label: 'Usuarios', sub: 'Docentes y alumnos', to: '/admin/usuarios' },
-                { icon: '🔒', label: 'Cierre académico', sub: 'Cerrar actas y período', to: '/admin/cierre' },
+                { icon: 'calendar', label: 'Períodos académicos', sub: 'Crear y transicionar períodos', to: '/admin/periodos' },
+                { icon: 'document', label: 'Oferta académica', sub: 'Planes, cursos y secciones', to: '/admin/oferta' },
+                { icon: 'users', label: 'Usuarios', sub: 'Docentes y alumnos', to: '/admin/usuarios' },
+                { icon: 'lock', label: 'Cierre académico', sub: 'Cerrar actas y período', to: '/admin/cierre' },
               ].map(item => (
                 <button
                   key={item.to}
                   onClick={() => navigate(item.to)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '11px 14px', borderRadius: 'var(--r-sm)',
-                    background: 'var(--surface-2)', border: '1px solid var(--line)',
-                    color: 'var(--ink)', textDecoration: 'none', cursor: 'pointer',
-                    transition: 'border-color .14s, background .14s', width: '100%', textAlign: 'left',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-soft)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface-2)'; }}
+                  className="quicklink"
                 >
-                  <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>{item.icon}</span>
+                  <Icon name={item.icon} size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{item.label}</div>
                     <div className="caption">{item.sub}</div>
                   </div>
-                  <span style={{ color: 'var(--ink-3)' }}>›</span>
+                  <Icon name="chevron-right" size={14} style={{ color: 'var(--ink-4)' }} />
                 </button>
               ))}
             </div>

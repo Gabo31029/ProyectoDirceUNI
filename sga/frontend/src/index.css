@@ -216,6 +216,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 .iconbtn:hover { background: var(--surface-3); color: var(--ink); }
 
+.quicklink {
+  display: flex; align-items: center; gap: 12;
+  padding: 11px 14px; border-radius: var(--r-sm);
+  background: var(--surface-2); border: 1px solid var(--line);
+  color: var(--ink); cursor: pointer; width: 100%; text-align: left;
+  transition: border-color .14s, background .14s; font-family: var(--font);
+  gap: 12px;
+}
+.quicklink:hover { border-color: var(--accent); background: var(--accent-soft); }
+
 .content { padding: 32px 40px 80px; max-width: 1280px; width: 100%; margin: 0 auto; }
 .content.wide { max-width: 1480px; }
 

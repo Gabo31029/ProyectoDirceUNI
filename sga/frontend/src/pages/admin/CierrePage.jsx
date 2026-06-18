@@ -95,7 +95,7 @@ export default function CierrePage() {
           <div className="card mb-6" style={{ borderColor: periodoCurrent.estado === 'REGISTRO_NOTAS' ? 'var(--accent-500)' : 'var(--border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <h3>🔒 Cerrar Período Académico</h3>
+                <h3>Cerrar Período Académico</h3>
                 <p className="text-secondary text-sm" style={{ marginTop: 4 }}>
                   Calcula PPS/PPA de todos los alumnos y evalúa condiciones académicas. <strong>Acción irreversible.</strong>
                 </p>
@@ -106,7 +106,7 @@ export default function CierrePage() {
                 disabled={periodoCurrent.estado !== 'REGISTRO_NOTAS'}
                 onClick={() => setConfirmModal({ type: 'periodo', id: periodoCurrent.id, label: periodoCurrent.nombre_periodo })}
               >
-                🔒 Cerrar Período
+                Cerrar Período
               </button>
             </div>
             {periodoCurrent.estado !== 'REGISTRO_NOTAS' && (
@@ -126,7 +126,7 @@ export default function CierrePage() {
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Cargando secciones...</div>
           ) : secciones.length === 0 ? (
             <div className="empty-state">
-              <span className="empty-state-icon">📋</span>
+              <span className="empty-state-icon"></span>
               <span className="empty-state-title">Sin secciones</span>
             </div>
           ) : (
@@ -158,7 +158,7 @@ export default function CierrePage() {
                         disabled={sec.estado === 'CERRADA'}
                         onClick={() => setConfirmModal({ type: 'acta', id: sec.id, label: `Sección ${sec.codigo_seccion}` })}
                       >
-                        {sec.estado === 'CERRADA' ? '✅ Cerrada' : '🔒 Cerrar Acta'}
+                        {sec.estado === 'CERRADA' ? 'Cerrada' : 'Cerrar Acta'}
                       </button>
                     </td>
                   </tr>
@@ -177,13 +177,12 @@ export default function CierrePage() {
               <>
                 <button className="btn btn-secondary" onClick={() => setConfirmModal(null)}>Cancelar</button>
                 <button id="btn-confirm-cierre" className="btn btn-danger" onClick={handleConfirm} disabled={processing}>
-                  {processing ? 'Procesando...' : '🔒 Confirmar Cierre'}
+                  {processing ? 'Procesando...' : 'Confirmar Cierre'}
                 </button>
               </>
             }
           >
             <div className="alert alert-warning">
-              <span>⚠️</span>
               <span>
                 Estás a punto de cerrar <strong>{confirmModal.label}</strong>.<br />
                 {confirmModal.type === 'periodo'

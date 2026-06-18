@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import StatCard from '../../components/StatCard'
 import Badge from '../../components/Badge'
+import Icon from '../../components/Icon'
 import { tenantService } from '../../services/tenantService'
 
 export default function DashboardAdminCentral() {
@@ -36,23 +37,23 @@ export default function DashboardAdminCentral() {
         </div>
 
         <div className="stat-grid" style={{ marginBottom: 24 }}>
-          <StatCard icon="🏛" label="Total Instituciones" value={loading ? '…' : tenants.length} colorClass="indigo" />
-          <StatCard icon="✓" label="Activas" value={loading ? '…' : activos} colorClass="green" />
-          <StatCard icon="⏸" label="Inactivas" value={loading ? '…' : inactivos} colorClass="amber" />
-          <StatCard icon="🌐" label="Sistema" value="Online" colorClass="blue" />
+          <StatCard icon={<Icon name="building" size={18} />} label="Total Instituciones" value={loading ? '…' : tenants.length} colorClass="indigo" />
+          <StatCard icon={<Icon name="check-circle" size={18} />} label="Activas" value={loading ? '…' : activos} colorClass="green" />
+          <StatCard icon={<Icon name="pause" size={18} />} label="Inactivas" value={loading ? '…' : inactivos} colorClass="amber" />
+          <StatCard icon={<Icon name="globe" size={18} />} label="Sistema" value="Online" colorClass="blue" />
         </div>
 
         <div className="grid-2">
-          {/* Instituciones recientes */}
           <div className="card card-flush">
-            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)' }}>
-              <span className="h3">🏛 Instituciones</span>
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="building" size={15} style={{ color: 'var(--ink-3)' }} />
+              <span className="h3">Instituciones</span>
             </div>
             {loading ? (
               <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--ink-3)' }}>Cargando…</div>
             ) : tenants.length === 0 ? (
               <div className="empty">
-                <div className="empty-ic">🏛</div>
+                <div className="empty-ic"><Icon name="building" size={32} style={{ color: 'var(--ink-4)' }} /></div>
                 <div className="empty-title">Sin instituciones registradas</div>
               </div>
             ) : (
@@ -76,33 +77,24 @@ export default function DashboardAdminCentral() {
             )}
           </div>
 
-          {/* Accesos rápidos */}
           <div className="card card-pad">
             <div className="h3" style={{ marginBottom: 14 }}>Accesos rápidos</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { icon: '🏛', label: 'Gestionar Instituciones', sub: 'Crear y administrar tenants', to: '/admin-central/tenants' },
-                { icon: '📚', label: 'Configurar Catálogos', sub: 'Catálogos globales del sistema', to: '/admin-central/catalogos' },
+                { icon: 'building', label: 'Gestionar Instituciones', sub: 'Crear y administrar tenants', to: '/admin-central/tenants' },
+                { icon: 'library', label: 'Catálogos globales', sub: 'Escalas, componentes y condiciones', to: '/admin-central/catalogos' },
               ].map(item => (
                 <button
                   key={item.to}
                   onClick={() => navigate(item.to)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '11px 14px', borderRadius: 'var(--r-sm)',
-                    background: 'var(--surface-2)', border: '1px solid var(--line)',
-                    color: 'var(--ink)', cursor: 'pointer', width: '100%', textAlign: 'left',
-                    transition: 'border-color .14s, background .14s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-soft)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface-2)'; }}
+                  className="quicklink"
                 >
-                  <span style={{ fontSize: '1.3rem' }}>{item.icon}</span>
+                  <Icon name={item.icon} size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{item.label}</div>
                     <div className="caption">{item.sub}</div>
                   </div>
-                  <span style={{ color: 'var(--ink-3)' }}>›</span>
+                  <Icon name="chevron-right" size={14} style={{ color: 'var(--ink-4)' }} />
                 </button>
               ))}
             </div>

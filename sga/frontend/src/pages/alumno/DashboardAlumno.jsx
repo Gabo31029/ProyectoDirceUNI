@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import StatCard from '../../components/StatCard'
 import Badge from '../../components/Badge'
+import Icon from '../../components/Icon'
 import { periodoService } from '../../services/periodoService'
 import { matriculaService } from '../../services/matriculaService'
 import { useAuth } from '../../context/AuthContext'
@@ -35,31 +36,28 @@ export default function DashboardAlumno() {
   return (
     <Layout>
       <div className="page-container">
-        {/* Page head */}
         <div className="page-head">
           <div className="ph-l">
-            <h1 className="h1">Hola, {auth?.nombre || 'Alumno'} 👋</h1>
-            <p className="ph-sub">Tu portal académico personal</p>
+            <h1 className="h1">Hola, {auth?.nombre || 'Alumno'}</h1>
+            <p className="ph-sub">Resumen de tu período académico</p>
           </div>
         </div>
 
-        {/* Stats */}
         <div className="stat-grid" style={{ marginBottom: 24 }}>
-          <StatCard icon="📅" label="Período Activo" value={loading ? '…' : (periodo?.nombre_periodo || 'Ninguno')} colorClass="indigo" />
-          <StatCard icon="📋" label="Estado Matrícula" value={loading ? '…' : (matriculaActiva ? 'Activa' : 'Sin matrícula')} colorClass={matriculaActiva ? 'green' : 'amber'} />
-          <StatCard icon="📚" label="Créditos" value={loading ? '…' : (matriculaActiva?.creditos_matriculados ?? '—')} colorClass="blue" />
-          <StatCard icon="🎓" label="Rol" value="Alumno" colorClass="violet" />
+          <StatCard icon={<Icon name="calendar" size={18} />} label="Período Activo" value={loading ? '…' : (periodo?.nombre_periodo || 'Ninguno')} colorClass="indigo" />
+          <StatCard icon={<Icon name="clipboard" size={18} />} label="Estado Matrícula" value={loading ? '…' : (matriculaActiva ? 'Activa' : 'Sin matrícula')} colorClass={matriculaActiva ? 'green' : 'amber'} />
+          <StatCard icon={<Icon name="bar-chart" size={18} />} label="Créditos" value={loading ? '…' : (matriculaActiva?.creditos_matriculados ?? '—')} colorClass="blue" />
+          <StatCard icon={<Icon name="graduation-cap" size={18} />} label="Rol" value="Alumno" colorClass="violet" />
         </div>
 
         <div className="grid-2">
-          {/* Período activo */}
           <div className="card card-pad">
-            <div className="h3" style={{ marginBottom: 14 }}>📅 Período Académico Activo</div>
+            <div className="h3" style={{ marginBottom: 14 }}>Período académico activo</div>
             {loading ? (
               <p className="muted small">Cargando…</p>
             ) : !periodo ? (
               <div className="empty">
-                <div className="empty-ic">📅</div>
+                <div className="empty-ic"><Icon name="calendar" size={32} style={{ color: 'var(--ink-4)' }} /></div>
                 <div className="empty-title">Sin período activo</div>
               </div>
             ) : (
@@ -84,25 +82,25 @@ export default function DashboardAlumno() {
                 </div>
                 {periodo.estado === 'MATRICULA' && (
                   <div className="banner banner-success" style={{ marginTop: 16 }}>
-                    ✓ El período está en fase de <strong>Matrícula</strong>. Puedes inscribirte en secciones.
+                    <Icon name="check-circle" size={14} />
+                    <span>El período está en fase de <strong>Matrícula</strong>. Puedes inscribirte en secciones.</span>
                   </div>
                 )}
               </>
             )}
           </div>
 
-          {/* Mi matrícula */}
           <div className="card card-pad">
-            <div className="h3" style={{ marginBottom: 14 }}>🗂 Mi Matrícula Actual</div>
+            <div className="h3" style={{ marginBottom: 14 }}>Matrícula actual</div>
             {loading ? (
               <p className="muted small">Cargando…</p>
             ) : !matriculaActiva ? (
               <div className="empty">
-                <div className="empty-ic">📋</div>
+                <div className="empty-ic"><Icon name="clipboard" size={32} style={{ color: 'var(--ink-4)' }} /></div>
                 <div className="empty-title">Sin matrícula activa</div>
-                <div className="empty-sub">Dirígete a Matrícula para inscribirte</div>
+                <div className="empty-sub">Ve a Matrícula para inscribirte en secciones</div>
                 <button className="btn btn-primary btn-sm" style={{ marginTop: 16 }} onClick={() => navigate('/alumno/matricula')}>
-                  Ir a Matrícula →
+                  Ir a Matrícula
                 </button>
               </div>
             ) : (
@@ -122,41 +120,32 @@ export default function DashboardAlumno() {
                   </div>
                 </div>
                 <button className="btn btn-secondary btn-sm" style={{ marginTop: 16 }} onClick={() => navigate('/alumno/matricula')}>
-                  Ver mis cursos →
+                  Ver mis cursos
                 </button>
               </>
             )}
           </div>
         </div>
 
-        {/* Accesos rápidos */}
         <div className="card card-pad" style={{ marginTop: 20 }}>
           <div className="h3" style={{ marginBottom: 14 }}>Accesos rápidos</div>
           <div className="grid-2">
             {[
-              { icon: '📋', label: 'Mi Matrícula', sub: 'Ver e inscribir cursos', to: '/alumno/matricula' },
-              { icon: '🎓', label: 'Historial Académico', sub: 'Notas y récord oficial', to: '/alumno/historial' },
+              { icon: 'clipboard', label: 'Mi Matrícula', sub: 'Ver e inscribir cursos', to: '/alumno/matricula' },
+              { icon: 'graduation-cap', label: 'Historial Académico', sub: 'Notas y récord oficial', to: '/alumno/historial' },
             ].map(item => (
               <button
                 key={item.to}
                 id={`quick-${item.to.split('/').pop()}`}
                 onClick={() => navigate(item.to)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '11px 14px', borderRadius: 'var(--r-sm)',
-                  background: 'var(--surface-2)', border: '1px solid var(--line)',
-                  color: 'var(--ink)', cursor: 'pointer',
-                  transition: 'border-color .14s, background .14s', width: '100%', textAlign: 'left',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-soft)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface-2)'; }}
+                className="quicklink"
               >
-                <span style={{ fontSize: '1.4rem' }}>{item.icon}</span>
+                <Icon name={item.icon} size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{item.label}</div>
                   <div className="caption">{item.sub}</div>
                 </div>
-                <span style={{ color: 'var(--ink-3)' }}>›</span>
+                <Icon name="chevron-right" size={14} style={{ color: 'var(--ink-4)' }} />
               </button>
             ))}
           </div>

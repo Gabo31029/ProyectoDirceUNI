@@ -4,6 +4,7 @@ import StatCard from '../../components/StatCard'
 import Badge from '../../components/Badge'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import ErrorAlert from '../../components/ErrorAlert'
+import Icon from '../../components/Icon'
 import { historialService } from '../../services/historialService'
 import { useAuth } from '../../context/AuthContext'
 
@@ -48,7 +49,7 @@ export default function HistorialPage() {
               onClick={handleDownloadPDF}
               disabled={downloading || !historial}
             >
-              {downloading ? '⏳ Descargando…' : '📄 Descargar Récord PDF'}
+              {downloading ? 'Descargando…' : 'Descargar Récord PDF'}
             </button>
           </div>
         </div>
@@ -60,7 +61,7 @@ export default function HistorialPage() {
         ) : !historial ? (
           <div className="card card-pad">
             <div className="empty">
-              <div className="empty-ic">🎓</div>
+              <div className="empty-ic"><Icon name="graduation-cap" size={32} style={{ color: 'var(--ink-4)' }} /></div>
               <div className="empty-title">Sin historial académico</div>
               <div className="empty-sub">Aún no tienes períodos académicos completados</div>
             </div>
@@ -70,9 +71,9 @@ export default function HistorialPage() {
             {/* Resumen */}
             {historial.resumen && (
               <div className="stat-grid" style={{ marginBottom: 24 }}>
-                <StatCard icon="📊" label="PPA Acumulado" value={historial.resumen.ppa ?? '—'} colorClass="indigo" />
-                <StatCard icon="✓" label="Créditos Aprobados" value={historial.resumen.creditos_aprobados ?? '—'} colorClass="green" />
-                <StatCard icon="📋" label="Condición Académica" value={historial.resumen.condicion_academica || 'Normal'} colorClass="blue" />
+                <StatCard icon={<Icon name="bar-chart" size={18} />} label="PPA Acumulado" value={historial.resumen.ppa ?? '—'} colorClass="indigo" />
+                <StatCard icon={<Icon name="check-circle" size={18} />} label="Créditos Aprobados" value={historial.resumen.creditos_aprobados ?? '—'} colorClass="green" />
+                <StatCard icon={<Icon name="clipboard" size={18} />} label="Condición Académica" value={historial.resumen.condicion_academica || 'Normal'} colorClass="blue" />
               </div>
             )}
 

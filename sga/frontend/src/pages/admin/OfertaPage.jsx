@@ -162,7 +162,7 @@ export default function OfertaPage() {
                   className="btn btn-primary btn-sm"
                   onClick={() => activarPlan(row.id)}
                 >
-                  ✅ Activar Plan
+                  Activar Plan
                 </button>
               )
             )}

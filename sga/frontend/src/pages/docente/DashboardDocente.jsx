@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import StatCard from '../../components/StatCard'
 import Badge from '../../components/Badge'
+import Icon from '../../components/Icon'
 import { periodoService } from '../../services/periodoService'
 import { useAuth } from '../../context/AuthContext'
 
@@ -24,26 +25,25 @@ export default function DashboardDocente() {
       <div className="page-container">
         <div className="page-head">
           <div className="ph-l">
-            <h1 className="h1">Bienvenido, {auth?.nombre || 'Docente'} 👋</h1>
-            <p className="ph-sub">Panel del docente — gestión de calificaciones</p>
+            <h1 className="h1">Hola, {auth?.nombre || 'Docente'}</h1>
+            <p className="ph-sub">Tus secciones y calificaciones del período activo</p>
           </div>
         </div>
 
         <div className="stat-grid" style={{ marginBottom: 24 }}>
-          <StatCard icon="📅" label="Período Activo" value={loading ? '…' : (periodo?.nombre_periodo || 'Ninguno')} colorClass="indigo" />
-          <StatCard icon="📊" label="Estado del Período" value={loading ? '…' : (periodo?.estado || '—')} colorClass="blue" />
-          <StatCard icon="👤" label="Rol" value="Docente" colorClass="green" />
+          <StatCard icon={<Icon name="calendar" size={18} />} label="Período Activo" value={loading ? '…' : (periodo?.nombre_periodo || 'Ninguno')} colorClass="indigo" />
+          <StatCard icon={<Icon name="bar-chart" size={18} />} label="Estado del Período" value={loading ? '…' : (periodo?.estado || '—')} colorClass="blue" />
+          <StatCard icon={<Icon name="user" size={18} />} label="Rol" value="Docente" colorClass="green" />
         </div>
 
         <div className="grid-2">
-          {/* Estado del período */}
           <div className="card card-pad">
-            <div className="h3" style={{ marginBottom: 14 }}>📅 Período Académico</div>
+            <div className="h3" style={{ marginBottom: 14 }}>Período académico</div>
             {loading ? (
               <p className="muted small">Cargando…</p>
             ) : !periodo ? (
               <div className="empty">
-                <div className="empty-ic">📅</div>
+                <div className="empty-ic"><Icon name="calendar" size={32} style={{ color: 'var(--ink-4)' }} /></div>
                 <div className="empty-title">Sin período activo</div>
                 <div className="empty-sub">No hay un período académico activo en este momento</div>
               </div>
@@ -69,35 +69,27 @@ export default function DashboardDocente() {
                 </div>
                 {periodo?.estado === 'REGISTRO_NOTAS' && (
                   <div className="banner banner-info" style={{ marginTop: 16 }}>
-                    📝 El período está en <strong>Registro de Notas</strong>. Puedes registrar y publicar calificaciones.
+                    <Icon name="info" size={14} />
+                    <span>El período está en <strong>Registro de Notas</strong>. Puedes registrar y publicar calificaciones.</span>
                   </div>
                 )}
               </>
             )}
           </div>
 
-          {/* Accesos rápidos */}
           <div className="card card-pad">
             <div className="h3" style={{ marginBottom: 14 }}>Accesos rápidos</div>
             <button
               id="link-calificaciones"
               onClick={() => navigate('/docente/calificaciones')}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '11px 14px', borderRadius: 'var(--r-sm)',
-                background: 'var(--surface-2)', border: '1px solid var(--line)',
-                color: 'var(--ink)', cursor: 'pointer', width: '100%', textAlign: 'left',
-                transition: 'border-color .14s, background .14s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-soft)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface-2)'; }}
+              className="quicklink"
             >
-              <span style={{ fontSize: '1.4rem' }}>📝</span>
+              <Icon name="clipboard" size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Gestionar Calificaciones</div>
-                <div className="caption">Registrar notas y publicar componentes de evaluación</div>
+                <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Calificaciones</div>
+                <div className="caption">Registrar notas y publicar componentes</div>
               </div>
-              <span style={{ color: 'var(--ink-3)' }}>›</span>
+              <Icon name="chevron-right" size={14} style={{ color: 'var(--ink-4)' }} />
             </button>
           </div>
         </div>

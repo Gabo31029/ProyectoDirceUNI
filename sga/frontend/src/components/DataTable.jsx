@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Icon from './Icon'
 
 export default function DataTable({ title, columns, data, actions, onAdd, addLabel = 'Nuevo', loading = false }) {
   const [search, setSearch] = useState('')
@@ -18,7 +19,7 @@ export default function DataTable({ title, columns, data, actions, onAdd, addLab
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="search" style={{ height: 34 }}>
-            <span style={{ fontSize: 13 }}>🔍</span>
+            <Icon name="search" size={14} style={{ color: 'var(--ink-3)' }} />
             <input
               placeholder="Buscar…"
               value={search}
@@ -59,7 +60,7 @@ export default function DataTable({ title, columns, data, actions, onAdd, addLab
               <tr>
                 <td colSpan={columns.length + (actions ? 1 : 0)}>
                   <div className="empty">
-                    <div className="empty-ic">📭</div>
+                    <div className="empty-ic"><Icon name="inbox" size={32} style={{ color: 'var(--ink-4)' }} /></div>
                     <div className="empty-title">Sin resultados</div>
                     <div className="empty-sub">No hay datos para mostrar</div>
                   </div>

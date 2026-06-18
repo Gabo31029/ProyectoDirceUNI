@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { authService } from '../services/authService'
+import Icon from '../components/Icon'
 
 const ROLE_REDIRECT = {
   ADMIN_CENTRAL: '/admin-central',
@@ -15,7 +16,6 @@ const DEMO_ACCOUNTS = [
     id: 'btn-demo-admin-central',
     role: 'ADMIN_CENTRAL',
     label: 'Admin Central',
-    icon: '🌐',
     email: 'admin.central@sga.local',
     password: 'AdminCentral123!',
     dominio_tenant: '',
@@ -24,7 +24,6 @@ const DEMO_ACCOUNTS = [
     id: 'btn-demo-admin',
     role: 'ADMIN',
     label: 'Administrador',
-    icon: '⚙️',
     email: 'admin@uni-demo.local',
     password: 'AdminDemo123!',
     dominio_tenant: 'uni-demo',
@@ -33,7 +32,6 @@ const DEMO_ACCOUNTS = [
     id: 'btn-demo-alumno',
     role: 'ALUMNO',
     label: 'Alumno',
-    icon: '🎓',
     email: 'alumno@uni-demo.local',
     password: 'AlumnoDemo123!',
     dominio_tenant: 'uni-demo',
@@ -42,7 +40,6 @@ const DEMO_ACCOUNTS = [
     id: 'btn-demo-docente',
     role: 'DOCENTE',
     label: 'Docente',
-    icon: '📝',
     email: null,
     password: null,
     dominio_tenant: 'uni-demo',
@@ -104,7 +101,6 @@ export default function LoginPage() {
   return (
     <div className="auth-stage">
       <div className="auth-card fade-in">
-        {/* Logo centrado */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div className="auth-logo">S</div>
           <div className="h2" style={{ marginBottom: 4 }}>SGA</div>
@@ -114,12 +110,15 @@ export default function LoginPage() {
         <div className="card card-pad" style={{ padding: '26px' }}>
           {error && (
             <div className="banner banner-danger" style={{ marginBottom: 16 }}>
-              <span style={{ flex: 1 }}>⚠ {error}</span>
+              <Icon name="warning" size={14} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{error}</span>
               <button
                 onClick={() => setError('')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: '1rem', padding: 0 }}
+                className="iconbtn"
                 aria-label="Cerrar"
-              >×</button>
+              >
+                <Icon name="x" size={13} />
+              </button>
             </div>
           )}
 
@@ -182,18 +181,16 @@ export default function LoginPage() {
               className="btn btn-primary btn-block btn-lg"
               disabled={anyLoading}
             >
-              {loading ? 'Autenticando…' : 'Iniciar sesión →'}
+              {loading ? 'Autenticando…' : 'Iniciar sesión'}
             </button>
           </form>
 
-          {/* Separador */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 14px' }}>
             <div className="divider" style={{ flex: 1 }} />
             <span className="caption">Acceso de demostración</span>
             <div className="divider" style={{ flex: 1 }} />
           </div>
 
-          {/* Botones demo */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             {DEMO_ACCOUNTS.map(acc => (
               <button
@@ -229,7 +226,11 @@ export default function LoginPage() {
                 }}
                 title={acc.disabled ? acc.hint : `Ingresar como ${acc.label}`}
               >
-                <span style={{ fontSize: 15 }}>{acc.icon}</span>
+                <Icon
+                  name={acc.role === 'ADMIN_CENTRAL' ? 'globe' : acc.role === 'ADMIN' ? 'settings' : acc.role === 'ALUMNO' ? 'graduation-cap' : 'clipboard'}
+                  size={14}
+                  style={{ flexShrink: 0, opacity: acc.disabled ? 0.5 : 1 }}
+                />
                 <span style={{ flex: 1, textAlign: 'left' }}>
                   {loadingDemo === acc.role ? 'Ingresando…' : acc.label}
                 </span>
@@ -243,7 +244,7 @@ export default function LoginPage() {
 
         <div style={{ textAlign: 'center', marginTop: 20 }}>
           <span className="caption">
-            Plataforma multi-institucional <strong style={{ color: 'var(--ink-2)' }}>SGA</strong> · 2026-I
+            SGA · Plataforma académica multi-institucional · 2026-I
           </span>
         </div>
       </div>
