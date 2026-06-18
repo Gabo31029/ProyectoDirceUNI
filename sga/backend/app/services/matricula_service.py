@@ -54,6 +54,10 @@ def _map_inscripcion(row: asyncpg.Record) -> InscripcionResponse:
 
 
 class MatriculaService:
+    """
+    Servicio encargado de coordinar la lógica de negocio y las transacciones del proceso de matrícula,
+    incluyendo inscripciones de asignaturas, validación de prerrequisitos, límites de créditos y retiros.
+    """
     def __init__(self, pool: asyncpg.Pool) -> None:
         self.pool = pool
         self.repo = MatriculaRepository(pool)
@@ -77,6 +81,11 @@ class MatriculaService:
         *,
         current_user: CurrentUser,
     ) -> MatriculaResponse:
+        """
+        Crea una nueva matrícula (cabecera) y una cuenta de seguimiento de créditos inicial en cero.
+        Valida que el período esté abierto para matrícula y que no exista una matrícula previa del alumno.
+        Todo el proceso corre dentro de una transacción de base de datos.
+        """
         alumno_id = self._resolve_alumno_id(current_user, payload)
 
         alumno = await self.repo.get_alumno(alumno_id, tenant_id)
@@ -136,6 +145,9 @@ class MatriculaService:
         alumno_id: UUID,
         current_user: CurrentUser,
     ) -> list[MatriculaResponse]:
+        """
+        Retorna la lista de matrículas realizadas por un alumno en una institución (tenant).
+        """
         if current_user.rol == "ALUMNO" and alumno_id != current_user.id:
             raise ForbiddenError("No puede consultar matriculas de otro alumno.")
         rows = await self.repo.list_matriculas_by_alumno(alumno_id, tenant_id)
@@ -149,6 +161,18 @@ class MatriculaService:
         *,
         current_user: CurrentUser,
     ) -> InscripcionResponse:
+        """
+        Inscribe un curso en la matrícula activa del alumno.
+        Lleva a cabo las siguientes validaciones críticas de negocio:
+        1. Que la matrícula esté activa y en fase de matrícula.
+        2. Que la sección destino esté abierta y cuente con vacantes.
+        3. Que no haya duplicidad de curso.
+        4. Que se cumplan los prerrequisitos académicos.
+        5. Que la suma de créditos no exceda la política de créditos semestral.
+        
+        La reserva de vacantes, la inserción del registro de inscripción y la actualización
+        de créditos se ejecutan en una transacción atómica para evitar concurrencias y sobrecupos.
+        """
         matricula = await self.repo.get_matricula_by_id(matricula_id, tenant_id)
         if matricula is None:
             raise NotFoundError("La matricula no existe o no pertenece al tenant.")
@@ -283,6 +307,12 @@ class MatriculaService:
         *,
         current_user: CurrentUser,
     ) -> InscripcionResponse:
+        """
+        Procesa el retiro voluntario o administrativo de un curso inscrito.
+        Transiciona la inscripción a estado 'RETIRADA', libera la vacante de la sección,
+        descuenta los créditos de la matrícula y de la cuenta de seguimiento del estudiante,
+        y registra el evento con su debida justificación en la auditoría general.
+        """
         inscripcion = await self.repo.get_inscripcion_by_id(inscripcion_id, tenant_id)
         if inscripcion is None:
             raise NotFoundError("La inscripcion no existe o no pertenece al tenant.")

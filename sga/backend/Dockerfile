@@ -1,30 +1,30 @@
 FROM python:3.12-slim
 
-# Set working directory
+# Directorio de trabajo
 WORKDIR /app
 
-# Set environment variables
+# Variables de entorno
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-# Install system dependencies (needed for psycopg2 and other native extensions)
+# Dependencias del sistema (necesarias para psycopg2 y extensiones nativas)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
+# Copiar requirements.txt
 COPY requirements.txt .
 
-# Install python dependencies
+# Instalar dependencias de Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the backend code
+# Copiar el resto del código del backend
 COPY . .
 
-# Expose port
+# Exponer puerto
 EXPOSE 8000
 
-# Start the application
+# Iniciar la aplicación
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
