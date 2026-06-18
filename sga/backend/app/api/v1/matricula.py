@@ -13,11 +13,13 @@ from app.models.schemas import (
 )
 from app.services.matricula_service import MatriculaService
 
+# Definición de Routers para FastAPI agrupados por etiquetas en Swagger
 router = APIRouter(prefix="/matriculas", tags=["Matricula"])
 inscripciones_router = APIRouter(prefix="/inscripciones", tags=["Inscripcion"])
 
 
 def _matricula_service() -> MatriculaService:
+    """Instancia el servicio de matrícula inyectando el pool de conexiones de la BD."""
     return MatriculaService(db.connection())
 
 
@@ -26,6 +28,14 @@ async def crear_matricula(
     payload: MatriculaCreate,
     current_user: CurrentUser = Depends(require_roles("ALUMNO", "ADMIN")),
 ) -> MatriculaResponse:
+    """
+    Registra una nueva matrícula para un alumno en un período académico activo.
+    
+    Autorización:
+    - Alumnos (pueden matricularse a sí mismos).
+    - Administradores (pueden matricular a cualquier alumno indicando su ID).
+    """
+    # Resuelve el tenant_id asociado a la institución desde el contexto de seguridad del JWT
     tenant_id = resolve_tenant_id(current_user)
     return await _matricula_service().crear_matricula(
         tenant_id, payload, current_user=current_user
@@ -37,6 +47,13 @@ async def listar_matriculas(
     alumno_id: UUID = Query(..., description="Identificador del alumno"),
     current_user: CurrentUser = Depends(require_roles("ALUMNO", "ADMIN", "DOCENTE")),
 ) -> list[MatriculaResponse]:
+    """
+    Lista el historial de matrículas registradas para un alumno específico.
+    
+    Autorización:
+    - Alumno (solo consulta su propio historial).
+    - Docentes y Administradores (pueden consultar a cualquier alumno).
+    """
     tenant_id = resolve_tenant_id(current_user)
     return await _matricula_service().list_matriculas(
         tenant_id, alumno_id=alumno_id, current_user=current_user
@@ -49,6 +66,14 @@ async def inscribir_curso(
     payload: InscripcionCreate,
     current_user: CurrentUser = Depends(require_roles("ALUMNO", "ADMIN")),
 ) -> InscripcionResponse:
+    """
+    Inscribe una asignatura específica (sección) en la matrícula activa del alumno.
+    
+    Valida:
+    - Estado de la sección y vacantes disponibles.
+    - Cumplimiento de prerrequisitos.
+    - Límite máximo de créditos permitidos en el período.
+    """
     tenant_id = resolve_tenant_id(current_user)
     return await _matricula_service().inscribir_curso(
         tenant_id, matricula_id, payload, current_user=current_user
@@ -60,6 +85,9 @@ async def listar_inscripciones(
     matricula_id: UUID,
     current_user: CurrentUser = Depends(require_roles("ALUMNO", "ADMIN", "DOCENTE")),
 ) -> list[InscripcionResponse]:
+    """
+    Lista todos las asignaturas (inscripciones) asociadas a una matrícula específica.
+    """
     tenant_id = resolve_tenant_id(current_user)
     return await _matricula_service().list_inscripciones(
         tenant_id, matricula_id, current_user=current_user
@@ -72,6 +100,14 @@ async def retirar_curso(
     payload: RetiroRequest,
     current_user: CurrentUser = Depends(require_roles("ALUMNO", "ADMIN")),
 ) -> InscripcionResponse:
+    """
+    Realiza el retiro administrativo o retiro voluntario de un curso inscrito.
+    
+    Efectos:
+    - Cambia el estado de la inscripción a 'RETIRADA'.
+    - Libera la vacante reservada en la sección.
+    - Actualiza y descuenta los créditos de la matrícula y cuenta de seguimiento.
+    """
     tenant_id = resolve_tenant_id(current_user)
     return await _matricula_service().retirar_curso(
         tenant_id, inscripcion_id, payload, current_user=current_user

@@ -1,8 +1,8 @@
 import os
 
-import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
+import pytest  # pyrefly: ignore [missing-import]
+import pytest_asyncio  # pyrefly: ignore [missing-import]
+from httpx import ASGITransport, AsyncClient  # pyrefly: ignore [missing-import]
 
 # Solo ejecutar si hay base de datos disponible
 pytestmark = pytest.mark.skipif(
@@ -13,8 +13,8 @@ pytestmark = pytest.mark.skipif(
 
 @pytest_asyncio.fixture
 async def client() -> AsyncClient:
-    from app.main import app
-    from app.core.database import lifespan
+    from app.main import app  # pyrefly: ignore [missing-import]
+    from app.core.database import lifespan  # pyrefly: ignore [missing-import]
 
     async with lifespan(app):
         transport = ASGITransport(app=app)
@@ -60,7 +60,7 @@ async def get_admin_headers(client: AsyncClient) -> dict[str, str]:
 
 @pytest.mark.asyncio
 async def test_periodo_integration_flow(client: AsyncClient) -> None:
-    from app.core.database import db
+    from app.core.database import db  # pyrefly: ignore [missing-import]
     # Limpiar cualquier periodo activo remanente de ejecuciones previas
     async with db.connection().acquire() as conn:
         await conn.execute(

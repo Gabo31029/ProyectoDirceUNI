@@ -208,7 +208,7 @@ def _create_db_engine() -> Engine:
     connect_args: dict = {}
     if "supabase" in url.lower():
         connect_args["sslmode"] = "require"
-    return create_engine(url, connect_args=connect_args or None)
+    return create_engine(url, connect_args=connect_args)
 
 
 def _assert_matricula_schema_compatible(conn) -> None:
