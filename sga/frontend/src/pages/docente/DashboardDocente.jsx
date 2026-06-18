@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import StatCard from '../../components/StatCard'
 import Badge from '../../components/Badge'
@@ -7,6 +8,7 @@ import { useAuth } from '../../context/AuthContext'
 
 export default function DashboardDocente() {
   const { auth } = useAuth()
+  const navigate = useNavigate()
   const [periodo, setPeriodo] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -20,80 +22,84 @@ export default function DashboardDocente() {
   return (
     <Layout>
       <div className="page-container">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Bienvenido, {auth?.nombre || 'Docente'}</h1>
-            <p className="page-subtitle">Panel del docente — gestión de calificaciones</p>
+        <div className="page-head">
+          <div className="ph-l">
+            <h1 className="h1">Bienvenido, {auth?.nombre || 'Docente'} 👋</h1>
+            <p className="ph-sub">Panel del docente — gestión de calificaciones</p>
           </div>
         </div>
 
-        <div className="grid-3 mb-6">
-          <StatCard icon="📅" label="Período Activo" value={loading ? '...' : (periodo?.nombre_periodo || 'Ninguno')} colorClass="indigo" />
-          <StatCard icon="📊" label="Estado Período" value={loading ? '...' : (periodo?.estado || '—')} colorClass="blue" />
-          <StatCard icon="👤" label="Mi Rol" value="DOCENTE" colorClass="purple" />
+        <div className="stat-grid" style={{ marginBottom: 24 }}>
+          <StatCard icon="📅" label="Período Activo" value={loading ? '…' : (periodo?.nombre_periodo || 'Ninguno')} colorClass="indigo" />
+          <StatCard icon="📊" label="Estado del Período" value={loading ? '…' : (periodo?.estado || '—')} colorClass="blue" />
+          <StatCard icon="👤" label="Rol" value="Docente" colorClass="green" />
         </div>
 
-        <div className="card">
-          <h3 style={{ marginBottom: 16 }}>📋 Estado del Período Académico</h3>
-          {loading ? (
-            <p className="text-muted text-sm">Cargando...</p>
-          ) : !periodo ? (
-            <div className="empty-state">
-              <span className="empty-state-icon">📅</span>
-              <span className="empty-state-title">Sin período activo</span>
-              <span className="empty-state-text">No hay un período académico activo en este momento</span>
-            </div>
-          ) : (
-            <div className="info-grid">
-              <div className="info-item">
-                <div className="info-label">Período</div>
-                <div className="info-value">{periodo.nombre_periodo}</div>
+        <div className="grid-2">
+          {/* Estado del período */}
+          <div className="card card-pad">
+            <div className="h3" style={{ marginBottom: 14 }}>📅 Período Académico</div>
+            {loading ? (
+              <p className="muted small">Cargando…</p>
+            ) : !periodo ? (
+              <div className="empty">
+                <div className="empty-ic">📅</div>
+                <div className="empty-title">Sin período activo</div>
+                <div className="empty-sub">No hay un período académico activo en este momento</div>
               </div>
-              <div className="info-item">
-                <div className="info-label">Estado</div>
-                <div className="info-value"><Badge value={periodo.estado} dot /></div>
-              </div>
-              <div className="info-item">
-                <div className="info-label">Fecha Inicio</div>
-                <div className="info-value">{periodo.fecha_inicio}</div>
-              </div>
-              <div className="info-item">
-                <div className="info-label">Fecha Fin</div>
-                <div className="info-value">{periodo.fecha_fin}</div>
-              </div>
-            </div>
-          )}
+            ) : (
+              <>
+                <div className="info-grid">
+                  <div>
+                    <div className="info-label">Período</div>
+                    <div className="info-value">{periodo.nombre_periodo}</div>
+                  </div>
+                  <div>
+                    <div className="info-label">Estado</div>
+                    <div className="info-value"><Badge value={periodo.estado} dot /></div>
+                  </div>
+                  <div>
+                    <div className="info-label">Inicio</div>
+                    <div className="info-value">{periodo.fecha_inicio}</div>
+                  </div>
+                  <div>
+                    <div className="info-label">Fin</div>
+                    <div className="info-value">{periodo.fecha_fin}</div>
+                  </div>
+                </div>
+                {periodo?.estado === 'REGISTRO_NOTAS' && (
+                  <div className="banner banner-info" style={{ marginTop: 16 }}>
+                    📝 El período está en <strong>Registro de Notas</strong>. Puedes registrar y publicar calificaciones.
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
-          {periodo?.estado === 'REGISTRO_NOTAS' && (
-            <div className="alert alert-info" style={{ marginTop: 16 }}>
-              <span>📝</span>
-              <span>El período está en <strong>REGISTRO_NOTAS</strong>. Puedes registrar y publicar calificaciones.</span>
-            </div>
-          )}
-        </div>
-
-        <div className="card" style={{ marginTop: 20 }}>
-          <h3 style={{ marginBottom: 16 }}>⚡ Accesos Rápidos</h3>
-          <a
-            href="/docente/calificaciones"
-            id="link-calificaciones"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '14px', borderRadius: 'var(--radius-md)',
-              background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-              color: 'var(--text-primary)', textDecoration: 'none',
-              transition: 'all var(--transition)',
-            }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-500)'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
-          >
-            <span style={{ fontSize: '1.4rem' }}>📝</span>
-            <div>
-              <div style={{ fontWeight: 600 }}>Gestionar Calificaciones</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Registrar notas y publicar componentes de evaluación</div>
-            </div>
-            <span style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}>→</span>
-          </a>
+          {/* Accesos rápidos */}
+          <div className="card card-pad">
+            <div className="h3" style={{ marginBottom: 14 }}>Accesos rápidos</div>
+            <button
+              id="link-calificaciones"
+              onClick={() => navigate('/docente/calificaciones')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '11px 14px', borderRadius: 'var(--r-sm)',
+                background: 'var(--surface-2)', border: '1px solid var(--line)',
+                color: 'var(--ink)', cursor: 'pointer', width: '100%', textAlign: 'left',
+                transition: 'border-color .14s, background .14s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-soft)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.background = 'var(--surface-2)'; }}
+            >
+              <span style={{ fontSize: '1.4rem' }}>📝</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Gestionar Calificaciones</div>
+                <div className="caption">Registrar notas y publicar componentes de evaluación</div>
+              </div>
+              <span style={{ color: 'var(--ink-3)' }}>›</span>
+            </button>
+          </div>
         </div>
       </div>
     </Layout>
