@@ -41,9 +41,20 @@ async def run_seed(pool: asyncpg.Pool) -> None:
                 valor_nuevo={"email": settings.seed_admin_central_email, "rol": "ADMIN_CENTRAL"},
             )
 
-        demo_tenant_id = await conn.fetchval(
+        exists_tenant = await conn.fetchval(
             "SELECT id FROM tenants WHERE dominio = 'uni-demo'"
         )
+        if not exists_tenant:
+            demo_tenant_id = await conn.fetchval(
+                """
+                INSERT INTO tenants (id, nombre, dominio, zona_horaria)
+                VALUES ('a1111111-1111-1111-1111-111111111111', 'Universidad Demo', 'uni-demo', 'America/Lima')
+                RETURNING id
+                """
+            )
+        else:
+            demo_tenant_id = exists_tenant
+
         if demo_tenant_id:
             exists_admin = await conn.fetchval(
                 """

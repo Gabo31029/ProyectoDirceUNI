@@ -481,7 +481,7 @@ async def test_oferta_crear_componente_evaluacion_success(mock_pool) -> None:
         orden_presentacion=1
     )
 
-    service.repo.get_by_id.return_value = {"id": seccion_id}
+    service.repo.get_seccion_by_id.return_value = {"id": seccion_id}
     service.repo.get_escala_by_id_and_tenant.return_value = {"id": escala_id}
     # Existing components sum to 60.00
     service.repo.list_componentes_by_seccion.return_value = [
@@ -520,7 +520,7 @@ async def test_oferta_crear_componente_evaluacion_exceeds_weight(mock_pool) -> N
         orden_presentacion=1
     )
 
-    service.repo.get_by_id.return_value = {"id": seccion_id}
+    service.repo.get_seccion_by_id.return_value = {"id": seccion_id}
     service.repo.get_escala_by_id_and_tenant.return_value = {"id": escala_id}
     # Existing components sum to 80.00 (80 + 30 = 110 > 100)
     service.repo.list_componentes_by_seccion.return_value = [
