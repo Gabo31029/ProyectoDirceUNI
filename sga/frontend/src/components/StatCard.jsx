@@ -1,12 +1,12 @@
-export default function StatCard({ icon, label, value, colorClass = 'indigo' }) {
+export default function StatCard({ icon, label, value, colorClass = 'blue' }) {
   return (
-    <div className="stat-card">
-      <div className={`stat-card-icon ${colorClass}`}>
-        {icon}
+    <div className="stat">
+      <div className="stat-top">
+        <div className={`stat-ic ${colorClass}`}>{icon}</div>
       </div>
-      <div className="stat-card-info">
-        <div className="stat-card-label">{label}</div>
-        <div className="stat-card-value">{value ?? '—'}</div>
+      <div>
+        <div className="stat-val">{value ?? '—'}</div>
+        <div className="stat-lbl">{label}</div>
       </div>
     </div>
   )

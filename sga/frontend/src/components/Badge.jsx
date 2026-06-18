@@ -1,36 +1,41 @@
-const ESTADO_LABELS = {
+const ESTADO_MAP = {
   // Períodos
-  CONFIGURACION: { label: 'Configuración', css: 'badge-warning' },
-  MATRICULA: { label: 'Matrícula', css: 'badge-info' },
-  REGISTRO_NOTAS: { label: 'Registro Notas', css: 'badge-indigo' },
-  CERRADO: { label: 'Cerrado', css: 'badge-muted' },
+  CONFIGURACION:   { label: 'Configuración',   tone: 'amber' },
+  MATRICULA:       { label: 'Matrícula',        tone: 'blue' },
+  REGISTRO_NOTAS:  { label: 'Reg. Notas',       tone: 'violet' },
+  CERRADO:         { label: 'Cerrado',           tone: 'gray' },
   // Secciones
-  ABIERTA: { label: 'Abierta', css: 'badge-success' },
-  SUSPENDIDA: { label: 'Suspendida', css: 'badge-danger' },
+  ABIERTA:         { label: 'Abierta',           tone: 'green' },
+  SUSPENDIDA:      { label: 'Suspendida',        tone: 'red' },
   // Componentes
-  BORRADOR: { label: 'Borrador', css: 'badge-warning' },
-  PUBLICADO: { label: 'Publicado', css: 'badge-success' },
+  BORRADOR:        { label: 'Borrador',          tone: 'amber' },
+  PUBLICADO:       { label: 'Publicado',         tone: 'green' },
   // Inscripciones
-  ACTIVA: { label: 'Activa', css: 'badge-success' },
-  RETIRADA: { label: 'Retirada', css: 'badge-danger' },
-  APROBADA: { label: 'Aprobada', css: 'badge-success' },
-  DESAPROBADA: { label: 'Desaprobada', css: 'badge-danger' },
-  ANULADA: { label: 'Anulada', css: 'badge-muted' },
-  // Usuarios
-  ADMIN: { label: 'Admin', css: 'badge-indigo' },
-  ADMIN_CENTRAL: { label: 'Admin Central', css: 'badge-purple' },
-  DOCENTE: { label: 'Docente', css: 'badge-info' },
-  ALUMNO: { label: 'Alumno', css: 'badge-success' },
+  ACTIVA:          { label: 'Activa',            tone: 'green' },
+  RETIRADA:        { label: 'Retirada',          tone: 'red' },
+  APROBADA:        { label: 'Aprobada',          tone: 'green' },
+  DESAPROBADA:     { label: 'Desaprobada',       tone: 'red' },
+  ANULADA:         { label: 'Anulada',           tone: 'gray' },
+  // Roles
+  ADMIN:           { label: 'Admin',             tone: 'blue' },
+  ADMIN_CENTRAL:   { label: 'Admin Central',     tone: 'violet' },
+  DOCENTE:         { label: 'Docente',           tone: 'blue' },
+  ALUMNO:          { label: 'Alumno',            tone: 'green' },
   // Tenant
-  ACTIVO: { label: 'Activo', css: 'badge-success' },
-  INACTIVO: { label: 'Inactivo', css: 'badge-danger' },
+  ACTIVO:          { label: 'Activo',            tone: 'green' },
+  INACTIVO:        { label: 'Inactivo',          tone: 'red' },
+  // Académico
+  NORMAL:              { label: 'Normal',              tone: 'green' },
+  RIESGO_ACADEMICO:    { label: 'Riesgo Académico',    tone: 'amber' },
+  SUSPENDIDO:          { label: 'Suspendido',           tone: 'red' },
+  RETIRADO_DEFINITIVO: { label: 'Retirado Definitivo', tone: 'red' },
 }
 
 export default function Badge({ value, dot }) {
-  const meta = ESTADO_LABELS[value] || { label: value, css: 'badge-muted' }
+  const meta = ESTADO_MAP[value] || { label: value, tone: 'gray' }
   return (
-    <span className={`badge ${meta.css}`}>
-      {dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor', display: 'inline-block' }} />}
+    <span className={`pill ${meta.tone}`}>
+      {dot && <span className="dot" />}
       {meta.label}
     </span>
   )
