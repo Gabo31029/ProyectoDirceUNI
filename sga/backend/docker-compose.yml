@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: sga_db
+    environment:
+      POSTGRES_USER: sga
+      POSTGRES_PASSWORD: sga_dev
+      POSTGRES_DB: sga
+    ports:
+      - "5432:5432"
+    volumes:
+      - sga_pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sga -d sga"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: sga_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://sga:sga_dev@db:5432/sga
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./tests:/app/tests
+
+volumes:
+  sga_pgdata:
