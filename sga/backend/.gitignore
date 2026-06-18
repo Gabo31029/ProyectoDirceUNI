@@ -1,0 +1,12 @@
+# Secretos locales - no commitear
+.env
+.env.local
+.env.*.local
+
+# Entorno virtual local
+.venv/
+
+# Python cache en este subproyecto
+__pycache__/
+*.py[cod]
+.pytest_cache/

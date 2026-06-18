@@ -1,0 +1,14 @@
+-- SGA: [Nombre del módulo] ([Tu nombre])
+-- Copia este archivo como: 005_mi_modulo_tuapellido.sql
+-- Reglas:
+--   - Usa CREATE TABLE IF NOT EXISTS solo si el equipo acuerda idempotencia;
+--     en proyecto nuevo basta CREATE TABLE.
+--   - Referencia tablas ya creadas en 001–004 (tenants, usuarios, periodo_academico, etc.).
+--   - No modifiques archivos 001–004 de otro integrante; pide PR o archivo ALTER aparte.
+
+-- Ejemplo:
+-- CREATE TABLE mi_tabla (
+--     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--     id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
+--     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- );

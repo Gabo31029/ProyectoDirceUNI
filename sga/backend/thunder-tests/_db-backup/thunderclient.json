@@ -1,0 +1,314 @@
+[
+  {
+    "_id": "r1111111-1111-1111-1111-111111111001",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111101",
+    "name": "Health",
+    "url": "/health",
+    "method": "GET",
+    "sortNum": 10000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [{ "name": "Accept", "value": "application/json" }],
+    "params": [],
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "json-query", "custom": "json.status", "action": "equal", "value": "ok" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111002",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111101",
+    "name": "Login ALUMNO (uni-demo)",
+    "url": "/api/v1/auth/login",
+    "method": "POST",
+    "sortNum": 20000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [
+      { "name": "Content-Type", "value": "application/json" },
+      { "name": "Accept", "value": "application/json" }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"email\": \"{{email_alumno}}\",\n  \"password\": \"{{password_alumno}}\",\n  \"dominio_tenant\": \"{{dominio_tenant}}\"\n}",
+      "form": []
+    },
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "set-env-var", "custom": "json.access_token", "action": "setto", "value": "{{access_token}}" },
+      { "type": "json-query", "custom": "json.rol", "action": "equal", "value": "ALUMNO" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111003",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111102",
+    "name": "GET /auth/me (guardar alumno_id)",
+    "url": "/api/v1/auth/me",
+    "method": "GET",
+    "sortNum": 10000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [],
+    "params": [],
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "set-env-var", "custom": "json.id", "action": "setto", "value": "{{alumno_id}}" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111004",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111102",
+    "name": "GET periodos (guardar id_periodo)",
+    "url": "/api/v1/periodos",
+    "method": "GET",
+    "sortNum": 20000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [],
+    "params": [],
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "set-env-var", "custom": "json.0.id", "action": "setto", "value": "{{id_periodo}}" },
+      { "type": "json-query", "custom": "json.0.estado", "action": "equal", "value": "MATRICULA" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111005",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111102",
+    "name": "GET secciones del periodo (guardar id_seccion)",
+    "url": "/api/v1/oferta/periodos/{{id_periodo}}/secciones",
+    "method": "GET",
+    "sortNum": 30000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [],
+    "params": [],
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "set-env-var", "custom": "json.0.id", "action": "setto", "value": "{{id_seccion}}" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111006",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111102",
+    "name": "POST crear matrícula",
+    "url": "/api/v1/matriculas",
+    "method": "POST",
+    "sortNum": 40000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [{ "name": "Content-Type", "value": "application/json" }],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"id_periodo\": \"{{id_periodo}}\"\n}",
+      "form": []
+    },
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "201" },
+      { "type": "set-env-var", "custom": "json.id", "action": "setto", "value": "{{matricula_id}}" },
+      { "type": "json-query", "custom": "json.estado", "action": "equal", "value": "ACTIVA" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111007",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111102",
+    "name": "GET listar matrículas por alumno",
+    "url": "/api/v1/matriculas",
+    "method": "GET",
+    "sortNum": 50000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [],
+    "params": [
+      { "name": "alumno_id", "value": "{{alumno_id}}", "isPath": false }
+    ],
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "json-query", "custom": "json.0.id", "action": "equal", "value": "{{matricula_id}}" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111008",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111102",
+    "name": "POST inscribir curso",
+    "url": "/api/v1/matriculas/{{matricula_id}}/inscripciones",
+    "method": "POST",
+    "sortNum": 60000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [{ "name": "Content-Type", "value": "application/json" }],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"id_seccion\": \"{{id_seccion}}\"\n}",
+      "form": []
+    },
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "201" },
+      { "type": "set-env-var", "custom": "json.id", "action": "setto", "value": "{{inscripcion_id}}" },
+      { "type": "json-query", "custom": "json.estado", "action": "equal", "value": "ACTIVA" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111009",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111102",
+    "name": "GET inscripciones de la matrícula",
+    "url": "/api/v1/matriculas/{{matricula_id}}/inscripciones",
+    "method": "GET",
+    "sortNum": 70000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [],
+    "params": [],
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "json-query", "custom": "json.0.id", "action": "equal", "value": "{{inscripcion_id}}" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111010",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111102",
+    "name": "POST retiro de inscripción",
+    "url": "/api/v1/inscripciones/{{inscripcion_id}}/retiro",
+    "method": "POST",
+    "sortNum": 80000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [{ "name": "Content-Type", "value": "application/json" }],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"motivo\": \"Prueba integral Thunder Client\"\n}",
+      "form": []
+    },
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "json-query", "custom": "json.estado", "action": "equal", "value": "RETIRADA" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111011",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111103",
+    "name": "Login ADMIN (uni-demo)",
+    "url": "/api/v1/auth/login",
+    "method": "POST",
+    "sortNum": 10000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [
+      { "name": "Content-Type", "value": "application/json" },
+      { "name": "Accept", "value": "application/json" }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"email\": \"{{email_admin}}\",\n  \"password\": \"{{password_admin}}\",\n  \"dominio_tenant\": \"{{dominio_tenant}}\"\n}",
+      "form": []
+    },
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" },
+      { "type": "set-env-var", "custom": "json.access_token", "action": "setto", "value": "{{access_token}}" },
+      { "type": "json-query", "custom": "json.rol", "action": "equal", "value": "ADMIN" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111012",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111103",
+    "name": "GET matrículas del alumno (rol ADMIN)",
+    "url": "/api/v1/matriculas",
+    "method": "GET",
+    "sortNum": 20000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [],
+    "params": [
+      { "name": "alumno_id", "value": "{{alumno_id}}", "isPath": false }
+    ],
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "200" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111013",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111104",
+    "name": "POST matrícula sin token → 401",
+    "url": "/api/v1/matriculas",
+    "method": "POST",
+    "sortNum": 10000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [{ "name": "Content-Type", "value": "application/json" }],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"id_periodo\": \"{{id_periodo}}\"\n}",
+      "form": []
+    },
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "401" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111014",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111104",
+    "name": "POST matrícula duplicada → 409",
+    "url": "/api/v1/matriculas",
+    "method": "POST",
+    "sortNum": 20000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [
+      { "name": "Authorization", "value": "Bearer {{access_token}}" },
+      { "name": "Content-Type", "value": "application/json" }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"id_periodo\": \"{{id_periodo}}\"\n}",
+      "form": []
+    },
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "409" }
+    ]
+  },
+  {
+    "_id": "r1111111-1111-1111-1111-111111111015",
+    "colId": "c1111111-1111-1111-1111-111111111111",
+    "containerId": "f1111111-1111-1111-1111-111111111104",
+    "name": "POST retiro duplicado → 409",
+    "url": "/api/v1/inscripciones/{{inscripcion_id}}/retiro",
+    "method": "POST",
+    "sortNum": 30000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "modified": "2026-06-03T12:00:00.000Z",
+    "headers": [
+      { "name": "Authorization", "value": "Bearer {{access_token}}" },
+      { "name": "Content-Type", "value": "application/json" }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"motivo\": \"Segundo retiro\"\n}",
+      "form": []
+    },
+    "tests": [
+      { "type": "res-code", "custom": "", "action": "equal", "value": "409" }
+    ]
+  }
+]
