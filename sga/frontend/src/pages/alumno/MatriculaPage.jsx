@@ -139,7 +139,6 @@ export default function MatriculaPage() {
         {periodo && (
           <div className={`alert ${periodo.estado === 'MATRICULA' ? 'alert-success' : 'alert-info'} mb-6`}>
             <span>
-            <span>
               Período <strong>{periodo.nombre_periodo}</strong> en estado{' '}
               <Badge value={periodo.estado} />.
               {periodo.estado !== 'MATRICULA' && ' La inscripción de nuevas secciones solo es posible en fase de MATRÍCULA.'}

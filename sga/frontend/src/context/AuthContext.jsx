@@ -13,11 +13,12 @@ export function AuthProvider({ children }) {
   })
 
   const login = useCallback((data) => {
-    // data: { access_token, rol, tenant_id, expires_in, nombre, apellido }
+    // data: { access_token, rol, tenant_id, expires_in, nombre, apellido, id }
     const payload = {
       token: data.access_token,
       rol: data.rol,
       tenantId: data.tenant_id,
+      id: data.id || null,
       nombre: data.nombre || '',
       apellido: data.apellido || '',
       expiresAt: Date.now() + data.expires_in * 1000,

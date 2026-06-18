@@ -63,7 +63,7 @@ export default function LoginPage() {
     login({ ...data, nombre: '', apellido: '' })
     try {
       const me = await authService.me()
-      login({ ...data, nombre: me.nombre, apellido: me.apellido })
+      login({ ...data, id: me.id, nombre: me.nombre, apellido: me.apellido })
     } catch {
       // ignore
     }

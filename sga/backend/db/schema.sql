@@ -84,10 +84,14 @@ CREATE TABLE token_blacklist (
 );
 
 CREATE TABLE intentos_login (
-    email VARCHAR(255) PRIMARY KEY,
-    intentos INTEGER NOT NULL DEFAULT 0,
-    ultimo_intento TIMESTAMPTZ,
-    bloqueado_hasta TIMESTAMPTZ
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) NOT NULL,
+    id_tenant UUID REFERENCES tenants (id) ON DELETE CASCADE,
+    intentos_fallidos INTEGER NOT NULL DEFAULT 0,
+    bloqueado_hasta TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_intentos_login UNIQUE (email, id_tenant)
 );
 
 CREATE TABLE auditoria_eventos (
@@ -467,7 +471,7 @@ CREATE INDEX idx_matricula_alumno ON matricula (id_alumno);
 -- UNIFIED INSCRIPCION TABLE (Leonardo & Luis Gabriel)
 CREATE TABLE inscripcion (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_inscripcion UUID, -- synced with id via trigger
+    id_inscripcion UUID UNIQUE, -- synced with id via trigger
     id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
     id_matricula UUID NOT NULL REFERENCES matricula (id) ON DELETE RESTRICT,
     id_seccion UUID NOT NULL REFERENCES seccion (id) ON DELETE RESTRICT,
