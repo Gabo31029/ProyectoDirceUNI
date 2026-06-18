@@ -171,12 +171,16 @@ def _cleanup_integration_data(conn, tenant_id: str) -> None:
         "DELETE FROM politica_credito WHERE id_periodo IN (SELECT id FROM periodo_academico WHERE id_tenant = CAST(:tid AS uuid))",
         "DELETE FROM periodo_academico WHERE id_tenant = CAST(:tid AS uuid)",
         "DELETE FROM curso WHERE id_tenant = CAST(:tid AS uuid)",
-        "DELETE FROM perfil_alumno WHERE id_usuario IN (SELECT id FROM usuarios WHERE id_tenant = CAST(:tid AS uuid))",
         "DELETE FROM plan_estudios WHERE id_tenant = CAST(:tid AS uuid)",
         "DELETE FROM usuario WHERE id_tenant = CAST(:tid AS uuid)",
         "DELETE FROM usuarios WHERE id_tenant = CAST(:tid AS uuid)",
         "DELETE FROM tenants WHERE id = CAST(:tid AS uuid)",
     ]
+    if _table_exists(conn, "perfil_alumno"):
+        statements.insert(
+            9,
+            "DELETE FROM perfil_alumno WHERE id_usuario IN (SELECT id FROM usuarios WHERE id_tenant = CAST(:tid AS uuid))",
+        )
     for sql in statements:
         conn.execute(text(sql), {"tid": tenant_id})
 
