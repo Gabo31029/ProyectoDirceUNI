@@ -328,19 +328,34 @@ def _insert_seed_data(conn) -> IntegrationSeed:
     )
     if hybrid:
         _insert_hybrid_legacy_seed(conn, params)
-    conn.execute(
-        text(
-            """
-            INSERT INTO periodo_academico (
-                id, id_tenant, nombre_periodo, fecha_inicio, fecha_fin, estado
-            ) VALUES (
-                CAST(:periodo_id AS uuid), CAST(:tenant_id AS uuid), '2026-1',
-                '2026-03-01', '2026-07-15', 'MATRICULA'
-            )
-            """
-        ),
-        params,
-    )
+    if hybrid:
+        conn.execute(
+            text(
+                """
+                INSERT INTO periodo_academico (
+                    id, id_periodo, id_tenant, nombre_periodo, fecha_inicio, fecha_fin, estado
+                ) VALUES (
+                    CAST(:periodo_id AS uuid), CAST(:periodo_id AS uuid), CAST(:tenant_id AS uuid), '2026-1',
+                    '2026-03-01', '2026-07-15', 'MATRICULA'
+                )
+                """
+            ),
+            params,
+        )
+    else:
+        conn.execute(
+            text(
+                """
+                INSERT INTO periodo_academico (
+                    id, id_tenant, nombre_periodo, fecha_inicio, fecha_fin, estado
+                ) VALUES (
+                    CAST(:periodo_id AS uuid), CAST(:tenant_id AS uuid), '2026-1',
+                    '2026-03-01', '2026-07-15', 'MATRICULA'
+                )
+                """
+            ),
+            params,
+        )
     conn.execute(
         text(
             """
@@ -350,19 +365,34 @@ def _insert_seed_data(conn) -> IntegrationSeed:
         ),
         params,
     )
-    conn.execute(
-        text(
-            """
-            INSERT INTO curso (
-                id, id_tenant, codigo_curso, nombre_curso, creditos, tipo_curso, ciclo_sugerido
-            ) VALUES
-                (CAST(:curso_base AS uuid), CAST(:tenant_id AS uuid), 'MAT101', 'Matematicas I', 4, 'OBLIGATORIO', 1),
-                (CAST(:curso_adv AS uuid), CAST(:tenant_id AS uuid), 'MAT201', 'Matematicas II', 4, 'OBLIGATORIO', 2),
-                (CAST(:curso_req AS uuid), CAST(:tenant_id AS uuid), 'MAT100', 'Precalculo', 3, 'OBLIGATORIO', 1)
-            """
-        ),
-        params,
-    )
+    if hybrid:
+        conn.execute(
+            text(
+                """
+                INSERT INTO curso (
+                    id, id_curso, id_tenant, codigo_curso, nombre_curso, creditos, tipo_curso, ciclo_sugerido
+                ) VALUES
+                    (CAST(:curso_base AS uuid), CAST(:curso_base AS uuid), CAST(:tenant_id AS uuid), 'MAT101', 'Matematicas I', 4, 'OBLIGATORIO', 1),
+                    (CAST(:curso_adv AS uuid), CAST(:curso_adv AS uuid), CAST(:tenant_id AS uuid), 'MAT201', 'Matematicas II', 4, 'OBLIGATORIO', 2),
+                    (CAST(:curso_req AS uuid), CAST(:curso_req AS uuid), CAST(:tenant_id AS uuid), 'MAT100', 'Precalculo', 3, 'OBLIGATORIO', 1)
+                """
+            ),
+            params,
+        )
+    else:
+        conn.execute(
+            text(
+                """
+                INSERT INTO curso (
+                    id, id_tenant, codigo_curso, nombre_curso, creditos, tipo_curso, ciclo_sugerido
+                ) VALUES
+                    (CAST(:curso_base AS uuid), CAST(:tenant_id AS uuid), 'MAT101', 'Matematicas I', 4, 'OBLIGATORIO', 1),
+                    (CAST(:curso_adv AS uuid), CAST(:tenant_id AS uuid), 'MAT201', 'Matematicas II', 4, 'OBLIGATORIO', 2),
+                    (CAST(:curso_req AS uuid), CAST(:tenant_id AS uuid), 'MAT100', 'Precalculo', 3, 'OBLIGATORIO', 1)
+                """
+            ),
+            params,
+        )
     conn.execute(
         text(
             """
@@ -372,20 +402,36 @@ def _insert_seed_data(conn) -> IntegrationSeed:
         ),
         params,
     )
-    conn.execute(
-        text(
-            """
-            INSERT INTO seccion (
-                id, id_tenant, id_periodo, id_curso, codigo_seccion,
-                vacantes_maximas, vacantes_disponibles, estado
-            ) VALUES
-                (CAST(:sec_ok AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_base AS uuid), 'A', 30, 30, 'ABIERTA'),
-                (CAST(:sec_llena AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_base AS uuid), 'B', 10, 0, 'ABIERTA'),
-                (CAST(:sec_prereq AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_adv AS uuid), 'C', 20, 20, 'ABIERTA')
-            """
-        ),
-        params,
-    )
+    if hybrid:
+        conn.execute(
+            text(
+                """
+                INSERT INTO seccion (
+                    id, id_seccion, id_tenant, id_periodo, id_curso, codigo_seccion,
+                    vacantes_maximas, vacantes_disponibles, estado
+                ) VALUES
+                    (CAST(:sec_ok AS uuid), CAST(:sec_ok AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_base AS uuid), 'A', 30, 30, 'ABIERTA'),
+                    (CAST(:sec_llena AS uuid), CAST(:sec_llena AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_base AS uuid), 'B', 10, 0, 'ABIERTA'),
+                    (CAST(:sec_prereq AS uuid), CAST(:sec_prereq AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_adv AS uuid), 'C', 20, 20, 'ABIERTA')
+                """
+            ),
+            params,
+        )
+    else:
+        conn.execute(
+            text(
+                """
+                INSERT INTO seccion (
+                    id, id_tenant, id_periodo, id_curso, codigo_seccion,
+                    vacantes_maximas, vacantes_disponibles, estado
+                ) VALUES
+                    (CAST(:sec_ok AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_base AS uuid), 'A', 30, 30, 'ABIERTA'),
+                    (CAST(:sec_llena AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_base AS uuid), 'B', 10, 0, 'ABIERTA'),
+                    (CAST(:sec_prereq AS uuid), CAST(:tenant_id AS uuid), CAST(:periodo_id AS uuid), CAST(:curso_adv AS uuid), 'C', 20, 20, 'ABIERTA')
+                """
+            ),
+            params,
+        )
     token, _, _ = create_access_token(
         user_id=ALUMNO_ID, rol="ALUMNO", tenant_id=TENANT_ID
     )
