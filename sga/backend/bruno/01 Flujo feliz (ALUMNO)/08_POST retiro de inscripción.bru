@@ -1,0 +1,30 @@
+meta {
+  name: POST retiro de inscripción
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/v1/inscripciones/{{inscripcion_id}}/retiro
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "motivo": "Prueba integral Thunder Client"
+  }
+}
+
+tests {
+  test("status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("json.estado is RETIRADA", function() {
+    expect(res.body.estado).to.equal("RETIRADA");
+  });
+}

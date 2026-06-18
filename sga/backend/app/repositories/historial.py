@@ -5,13 +5,21 @@ from app.models.cierre import SnapshotPromedio, CondicionAcademicaAlumno
 
 class HistorialRepository:
     """
-    Optimized repository for academic history and records consolidation.
-    Provides aggregated queries linking multi-table academic history objects.
+    Repositorio optimizado para la consolidación de récords académicos e historial del alumno.
+    
+    Esta clase realiza consultas de solo lectura con JOINs complejos para unificar
+    el historial de inscripciones, snapshots de promedios ponderados y condiciones del alumno.
+    Decisión de diseño: Al ser una vista agregada y de solo lectura, no cuenta con un modelo
+    OR asociativo propio y se agrupa de manera limpia en esta clase.
     """
     
     def get_inscriptions_history(self, db: Session, id_perfil_alumno: str) -> List[Inscripcion]:
         """
-        Retrieves all student inscriptions with course, section, and period details.
+        Recupera el historial de asignaturas en las que se ha inscrito el alumno.
+        
+        Realiza JOINs para traer los detalles del curso, sección y período correspondiente.
+        Ordena cronológicamente los resultados por la fecha de inicio del período académico,
+        y secundariamente de forma alfabética por el código del curso.
         """
         return (
             db.query(Inscripcion)
@@ -26,7 +34,11 @@ class HistorialRepository:
 
     def get_snapshots_history(self, db: Session, id_perfil_alumno: str) -> List[SnapshotPromedio]:
         """
-        Retrieves all official snapshots of averages for the student, sorted by period date.
+        Recupera el historial de promedios ponderados (PPS/PPA) registrados para el alumno.
+        
+        La capa de servicios se encargará de realizar el filtrado de versiones intermedias
+        (aquellas que tengan un snapshot_posterior referenciándolas) para presentar el récord oficial.
+        Ordena cronológicamente los snapshots por fecha de inicio del período.
         """
         # We need only the latest version of snapshot for each period (i.e. those that do not have a snapshot_posterior).
         # We can fetch all and keep only the latest in Python, or select them with a SQL subquery.
@@ -42,7 +54,10 @@ class HistorialRepository:
 
     def get_conditions_history(self, db: Session, id_perfil_alumno: str) -> List[CondicionAcademicaAlumno]:
         """
-        Retrieves all academic conditions recorded for the student.
+        Recupera el historial completo de condiciones académicas que ha tenido el estudiante.
+        
+        Realiza un JOIN con PeriodoAcademico para ordenar los resultados cronológicamente
+        por período y luego por la fecha específica de activación de la condición.
         """
         return (
             db.query(CondicionAcademicaAlumno)

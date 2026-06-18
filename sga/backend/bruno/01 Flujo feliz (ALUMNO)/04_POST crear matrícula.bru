@@ -1,0 +1,34 @@
+meta {
+  name: POST crear matrícula
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/matriculas
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id_periodo": "{{id_periodo}}"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("matricula_id", res.body.id);
+}
+
+tests {
+  test("status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+  test("json.estado is ACTIVA", function() {
+    expect(res.body.estado).to.equal("ACTIVA");
+  });
+}

@@ -1,0 +1,24 @@
+meta {
+  name: GET periodos (guardar id_periodo)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/periodos
+  body: none
+  auth: none
+}
+
+script:post-response {
+  bru.setEnvVar("id_periodo", res.body[0].id);
+}
+
+tests {
+  test("status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("json.0.estado is MATRICULA", function() {
+    expect(res.body[0].estado).to.equal("MATRICULA");
+  });
+}

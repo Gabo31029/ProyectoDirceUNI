@@ -1,0 +1,21 @@
+meta {
+  name: GET /auth/me (guardar alumno_id)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/auth/me
+  body: none
+  auth: none
+}
+
+script:post-response {
+  bru.setEnvVar("alumno_id", res.body.id);
+}
+
+tests {
+  test("status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

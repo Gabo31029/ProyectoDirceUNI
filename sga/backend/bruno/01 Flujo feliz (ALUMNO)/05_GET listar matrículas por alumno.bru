@@ -1,0 +1,20 @@
+meta {
+  name: GET listar matrículas por alumno
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/v1/matriculas
+  body: none
+  auth: none
+}
+
+tests {
+  test("status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("json.0.id is {{matricula_id}}", function() {
+    expect(res.body[0].id).to.equal("{{matricula_id}}");
+  });
+}

@@ -1,0 +1,16 @@
+meta {
+  name: 04 Cerrar Acta
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/cierre/secciones/{{id_seccion}}/cerrar-acta
+  body: none
+  auth: none
+}
+
+headers {
+  X-User-Role: ADMINISTRADOR
+  X-User-ID: {{id_admin}}
+}

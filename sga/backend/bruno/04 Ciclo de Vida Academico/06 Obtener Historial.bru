@@ -1,0 +1,25 @@
+meta {
+  name: 06 Obtener Historial
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/historial/alumnos/{{id_perfil_alumno}}
+  body: none
+  auth: none
+}
+
+headers {
+  X-User-Role: ADMINISTRADOR
+  X-User-ID: {{id_admin}}
+}
+
+tests {
+  test("status 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("tiene campo periodos", function() {
+    expect(res.body).to.have.property("periodos");
+  });
+}

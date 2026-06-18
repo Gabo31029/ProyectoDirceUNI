@@ -1,0 +1,28 @@
+meta {
+  name: POST matrícula duplicada → 409
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/matriculas
+  body: json
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "id_periodo": "{{id_periodo}}"
+  }
+}
+
+tests {
+  test("status code is 409", function() {
+    expect(res.getStatus()).to.equal(409);
+  });
+}

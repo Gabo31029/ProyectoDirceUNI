@@ -13,8 +13,12 @@ def api_cerrar_acta(
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Cierra de forma definitiva el acta de calificaciones de una sección. (Solo Coordinador/Admin)
-    Calcula notas finales y estados de aprobación.
+    Endpoint para realizar el cierre definitivo de las calificaciones de una sección.
+
+    Seguridad y transaccionalidad:
+    - Restringido a Docente Coordinador de la sección o Administrador.
+    - Cierra en cascada los componentes y calcula la nota final promedio de las inscripciones.
+    - Manejo transaccional: Llama a `db.commit()` tras confirmar el éxito de la operación.
     """
     inscriptions = cerrar_acta_seccion(db, id_seccion, user)
     db.commit()
@@ -31,7 +35,13 @@ def api_cerrar_periodo(
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Cierra el período académico, calculando PPS/PPA y evaluando políticas de condición académica para todos los alumnos. (Solo Admin)
+    Endpoint para ejecutar el cierre batch total de un período académico.
+
+    Seguridad y transaccionalidad:
+    - Permitido exclusivamente para el rol ADMINISTRADOR.
+    - Lógica batch: Calcula PPS/PPA para todos los estudiantes matriculados en el período
+      y evalúa las políticas de riesgo/condiciones académicas de forma masiva.
+    - Manejo transaccional: Llama a `db.commit()` al finalizar de procesar a todos los estudiantes.
     """
     periodo = cerrar_periodo_academico(db, id_periodo, user)
     db.commit()

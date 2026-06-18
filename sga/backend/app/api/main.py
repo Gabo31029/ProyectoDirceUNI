@@ -12,6 +12,8 @@ import app.models.seguimiento     # noqa: F401
 from app.api.calificaciones import router as calificaciones_router
 from app.api.cierre import router as cierre_router
 from app.api.historial import router as historial_router
+from app.api.v1.router import api_router
+from app.core.database import lifespan
 
 app = FastAPI(
     title="SGA – Sistema de Gestión Académica",
@@ -20,7 +22,8 @@ app = FastAPI(
         "Gestión de Calificaciones, Cierre Académico e Historial Académico."
     ),
     version="1.0.0",
-    contact={"name": "Grupo 4 – SW505 2026-1"}
+    contact={"name": "Grupo 4 – SW505 2026-1"},
+    lifespan=lifespan
 )
 
 import os
@@ -50,6 +53,7 @@ def startup_event() -> None:
 app.include_router(calificaciones_router)
 app.include_router(cierre_router)
 app.include_router(historial_router)
+app.include_router(api_router)
 
 # ── Health-check ──────────────────────────────────────────────────────────────
 @app.get("/", tags=["Health"])

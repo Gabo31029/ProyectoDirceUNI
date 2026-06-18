@@ -19,33 +19,43 @@ def obtener_historial_consolidado(
     user: CurrentUser
 ) -> Dict[str, Any]:
     """
-    Compiles and returns the consolidated academic history of a student.
-    Only accessible by the student themselves, docetes, or administrators.
+    Caso de uso: Compila y retorna el historial académico consolidado de un estudiante en formato JSON.
+
+    Reglas de negocio y seguridad:
+    - Control de accesos (RBAC):
+        * Si el rol es ALUMNO, solo se le permite consultar su propio perfil (`id_perfil_alumno`).
+        * Los roles DOCENTE y ADMINISTRADOR pueden consultar el historial de cualquier estudiante.
+    - Consolidación y procesamiento de datos:
+        1. Recupera las inscripciones históricas, snapshots de promedios y condiciones académicas.
+        2. Filtrado de snapshots: Agrupa por período y conserva únicamente la versión de promedio más reciente
+           (por ejemplo, resolviendo recálculos intermedios tras correcciones de notas).
+        3. Agrupación por períodos: Mapea las inscripciones de asignaturas dentro de su respectivo período académico,
+           anexando el PPS y PPA correspondiente a dicho período académico.
+        4. Ordenamiento cronológico de los períodos académicos de forma ascendente.
+    - Auditoría: Registra la operación 'CONSULTAR_HISTORIAL' en la tabla de auditoría.
     """
-    # Fetch profile to check tenant
+    # Validar existencia del perfil de alumno
     perfil = db.query(PerfilAlumno).filter(PerfilAlumno.id_perfil_alumno == id_perfil_alumno).first()
     if not perfil:
         log_audit(db, user.id_tenant, user.id_usuario, "CONSULTAR_HISTORIAL", "perfil_alumno", id_perfil_alumno, "RECHAZADA", motivo_rechazo="Perfil del alumno no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil del alumno no encontrado.")
 
-    # Authorization
+    # Control de accesos
     if user.rol == "ALUMNO" and user.id_perfil != id_perfil_alumno:
         log_audit(db, user.id_tenant, user.id_usuario, "CONSULTAR_HISTORIAL", "perfil_alumno", id_perfil_alumno, "RECHAZADA", motivo_rechazo="Alumno intentando ver otro historial.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso para ver el historial de otro alumno.")
 
-    # 1. Fetch data
+    # 1. Recuperar los datos desde el repositorio optimizado
     inscriptions = historial_repo.get_inscriptions_history(db, id_perfil_alumno)
     snapshots = historial_repo.get_snapshots_history(db, id_perfil_alumno)
     conditions = historial_repo.get_conditions_history(db, id_perfil_alumno)
 
-    # 2. Filter snapshots to keep only the latest version per period
-    # Group snapshots by period, keep the one that is NOT referenced as id_snapshot_anterior
-    # Or just keep the latest created_at per period
+    # 2. Filtrado: Mantener el último promedio por período (el de mayor fecha de creación)
     latest_snapshots_by_period = {}
     for snap in snapshots:
         latest_snapshots_by_period[snap.id_periodo] = snap
 
-    # 3. Group inscriptions by period
+    # 3. Estructurar y agrupar inscripciones de cursos por período académico
     periods_map = {}
     for ins in inscriptions:
         periodo = ins.seccion.periodo
@@ -70,19 +80,19 @@ def obtener_historial_consolidado(
             "codigo_seccion": ins.seccion.codigo_seccion
         })
 
-    # Add snapshot averages to period structures
+    # Vincular los promedios semestral y acumulado a la estructura de cada período
     for pid, p_data in periods_map.items():
         snap = latest_snapshots_by_period.get(pid)
         if snap:
             p_data["pps"] = float(snap.pps)
             p_data["ppa"] = float(snap.ppa)
 
-    # Sort periods chronologically
+    # Ordenar la lista de períodos cronológicamente
     sorted_periods = sorted(periods_map.values(), key=lambda x: x["fecha_inicio"])
     for p in sorted_periods:
-        del p["fecha_inicio"]  # Clean up date object before response
+        del p["fecha_inicio"]  # Limpiar el objeto date no serializable antes de la respuesta
 
-    # 4. Format conditions list
+    # 4. Formatear la lista histórica de condiciones académicas
     formatted_conditions = []
     for cond in conditions:
         formatted_conditions.append({
@@ -95,7 +105,7 @@ def obtener_historial_consolidado(
             "observaciones": cond.observaciones
         })
 
-    # Get overall cumulative PPA
+    # Obtener el PPA actual global vigente
     latest_snap = db.query(SnapshotPromedio).join(PeriodoAcademico).filter(
         SnapshotPromedio.id_perfil_alumno == id_perfil_alumno
     ).order_by(PeriodoAcademico.fecha_fin.desc(), SnapshotPromedio.created_at.desc()).first()
@@ -120,7 +130,20 @@ def generar_record_notas_pdf(
     user: CurrentUser
 ) -> bytes:
     """
-    Generates a PDF document for the student's official transcript.
+    Caso de uso: Genera un documento PDF oficial del récord de notas del estudiante.
+
+    Reglas de negocio y diseño del reporte:
+    - Utiliza la librería fpdf2 para la construcción programática y estructurada del PDF.
+    - Se reutiliza la lógica del caso de uso `obtener_historial_consolidado` para obtener los datos
+      asegurando que se apliquen las mismas validaciones de seguridad y filtrado de versiones de promedios.
+    - Estructura visual:
+        1. Encabezado institucional y metadatos del estudiante (nombre, código, carrera, PPA global).
+        2. Detalle tabular por período académico: lista de asignaturas con sus créditos, nota final obtenida,
+           estado (Aprobado/Desaprobado) y resumen del PPS y PPA al finalizar dicho semestre.
+        3. Historial de condiciones académicas (alertas de riesgo, resoluciones y observaciones).
+        4. Firma y sello digital de seguridad con fecha y hora de generación.
+    - Manejo de bytes: Exporta el PDF como cadena de caracteres cruda (latin-1) y la codifica a bytes
+      para ser enviada como stream de datos en la respuesta HTTP.
     """
     hist = obtener_historial_consolidado(db, id_perfil_alumno, user)
     
@@ -128,14 +151,14 @@ def generar_record_notas_pdf(
     pdf.add_page()
     pdf.set_font("Helvetica", size=12)
     
-    # Title
+    # Título del Reporte
     pdf.set_font("Helvetica", style="B", size=16)
     pdf.cell(0, 10, "SISTEMA DE GESTION ACADEMICA (SGA)", ln=True, align="C")
     pdf.set_font("Helvetica", size=12)
     pdf.cell(0, 10, "RECORD OFICIAL DE NOTAS", ln=True, align="C")
     pdf.ln(5)
     
-    # Student Header Info
+    # Encabezado con información académica del estudiante
     pdf.set_font("Helvetica", style="B", size=10)
     pdf.cell(40, 6, "Alumno:")
     pdf.set_font("Helvetica", size=10)
@@ -157,12 +180,12 @@ def generar_record_notas_pdf(
     pdf.cell(0, 6, f"{hist['ppa_actual']:.2f}", ln=True)
     pdf.ln(10)
     
-    # Loop periods
+    # Renderizar tablas agrupadas por período académico
     for per in hist["periodos"]:
         pdf.set_font("Helvetica", style="B", size=11)
         pdf.cell(0, 8, f"Periodo Academico: {per['nombre_periodo']}", ln=True)
         
-        # Table Header
+        # Cabecera de la tabla
         pdf.set_font("Helvetica", style="B", size=9)
         pdf.cell(25, 6, "Codigo", border=1)
         pdf.cell(90, 6, "Curso", border=1)
@@ -171,7 +194,7 @@ def generar_record_notas_pdf(
         pdf.cell(30, 6, "Estado", border=1, align="C")
         pdf.ln()
         
-        # Table Body
+        # Cuerpo de la tabla con los cursos inscritos
         pdf.set_font("Helvetica", size=9)
         for ins in per["inscripciones"]:
             pdf.cell(25, 6, ins["codigo_curso"], border=1)
@@ -183,12 +206,12 @@ def generar_record_notas_pdf(
             pdf.cell(30, 6, ins["estado"], border=1, align="C")
             pdf.ln()
             
-        # Period Averages Summary
+        # Promedios del período (Semestral y Acumulado)
         pdf.set_font("Helvetica", style="I", size=9)
         pdf.cell(0, 6, f"Promedio Ponderado Semestral (PPS): {per['pps']:.2f}  |  Promedio Ponderado Acumulado (PPA): {per['ppa']:.2f}", ln=True)
         pdf.ln(5)
 
-    # Academic Conditions
+    # Historial de alertas de condiciones académicas (si existen)
     if hist["condiciones"]:
         pdf.ln(5)
         pdf.set_font("Helvetica", style="B", size=11)
@@ -212,15 +235,14 @@ def generar_record_notas_pdf(
             pdf.cell(70, 6, obs, border=1)
             pdf.ln()
 
-    # Footer signature
+    # Pie de página oficial y firma digital
     pdf.ln(15)
     pdf.set_font("Helvetica", style="I", size=8)
     pdf.cell(0, 4, f"Documento generado de forma oficial el {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align="C")
     pdf.cell(0, 4, "Sello Digital de Seguridad - Validado por la Oficina de Asuntos Academicos", ln=True, align="C")
     
-    # Save PDF to bytes
+    # Conversión del PDF generado en memoria a un flujo de bytes
     pdf_bytes = pdf.output(dest="S")
-    # If fpdf output returns a bytearray or string, we cast to bytes
     if isinstance(pdf_bytes, str):
         pdf_bytes = pdf_bytes.encode("latin-1")
     elif isinstance(pdf_bytes, bytearray):

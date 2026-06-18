@@ -1,0 +1,37 @@
+meta {
+  name: Login ALUMNO (uni-demo)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/auth/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+  Accept: application/json
+}
+
+body:json {
+  {
+    "email": "{{email_alumno}}",
+    "password": "{{password_alumno}}",
+    "dominio_tenant": "{{dominio_tenant}}"
+  }
+}
+
+script:post-response {
+  bru.setEnvVar("access_token", res.body.access_token);
+}
+
+tests {
+  test("status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("json.rol is ALUMNO", function() {
+    expect(res.body.rol).to.equal("ALUMNO");
+  });
+}

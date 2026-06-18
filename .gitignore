@@ -27,10 +27,8 @@ build/
 .env.*
 !.env.example
 
-# ============================================================
-# Bruno (API testing tool - local use only)
-# ============================================================
-**/bruno/
+# Bruno collection (.bru files) are tracked so teammates can use them
+# environments/ is also tracked since it only contains demo data (real secrets are in .env)
 
 # ============================================================
 # IDE & Editor

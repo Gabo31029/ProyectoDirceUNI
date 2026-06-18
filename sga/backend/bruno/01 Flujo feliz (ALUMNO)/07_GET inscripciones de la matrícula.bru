@@ -1,0 +1,20 @@
+meta {
+  name: GET inscripciones de la matrícula
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/v1/matriculas/{{matricula_id}}/inscripciones
+  body: none
+  auth: none
+}
+
+tests {
+  test("status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("json.0.id is {{inscripcion_id}}", function() {
+    expect(res.body[0].id).to.equal("{{inscripcion_id}}");
+  });
+}

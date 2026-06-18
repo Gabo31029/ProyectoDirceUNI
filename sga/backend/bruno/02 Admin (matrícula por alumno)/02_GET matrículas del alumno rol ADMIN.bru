@@ -1,0 +1,17 @@
+meta {
+  name: GET matrículas del alumno (rol ADMIN)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/matriculas
+  body: none
+  auth: none
+}
+
+tests {
+  test("status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}
