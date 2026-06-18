@@ -4,10 +4,15 @@ import asyncpg
 
 
 class MatriculaRepository:
+    """
+    Repositorio de datos para el módulo de matrícula e inscripciones.
+    Maneja consultas e inserciones directas a PostgreSQL utilizando asyncpg.
+    """
     def __init__(self, pool: asyncpg.Pool) -> None:
         self.pool = pool
 
     async def get_alumno(self, alumno_id: UUID, tenant_id: UUID) -> asyncpg.Record | None:
+        """Obtiene un alumno activo por su ID y Tenant de la tabla de usuarios."""
         return await self.pool.fetchrow(
             """
             SELECT id, email, nombre, apellido, rol, id_tenant, activo
@@ -19,6 +24,7 @@ class MatriculaRepository:
         )
 
     async def get_periodo(self, periodo_id: UUID, tenant_id: UUID) -> asyncpg.Record | None:
+        """Obtiene la información de un período académico específico."""
         return await self.pool.fetchrow(
             "SELECT * FROM periodo_academico WHERE id = $1 AND id_tenant = $2",
             periodo_id,
@@ -69,6 +75,7 @@ class MatriculaRepository:
         alumno_id: UUID,
         periodo_id: UUID,
     ) -> asyncpg.Record:
+        """Crea la cabecera de la matrícula en la BD dentro de la transacción actual."""
         return await conn.fetchrow(
             """
             INSERT INTO matricula (id_tenant, id_alumno, id_periodo)
@@ -117,6 +124,10 @@ class MatriculaRepository:
     async def reservar_vacante(
         self, conn: asyncpg.Connection, seccion_id: UUID, tenant_id: UUID
     ) -> asyncpg.Record | None:
+        """
+        Disminuye en 1 las vacantes disponibles de una sección.
+        Ejecutado con bloqueos (FOR UPDATE) dentro de una transacción para evitar sobrecupo.
+        """
         return await conn.fetchrow(
             """
             UPDATE seccion
@@ -234,6 +245,7 @@ class MatriculaRepository:
     async def list_cursos_aprobados_alumno(
         self, alumno_id: UUID, tenant_id: UUID, curso_ids: list[UUID]
     ) -> set[UUID]:
+        """Obtiene el conjunto de IDs de asignaturas aprobadas por el alumno de la lista especificada."""
         if not curso_ids:
             return set()
         rows = await self.pool.fetch(
@@ -268,6 +280,10 @@ class MatriculaRepository:
         alumno_id: UUID,
         delta_creditos: int,
     ) -> None:
+        """
+        Actualiza (incrementa o decrementa) el total de créditos inscritos del período
+        en la cuenta de seguimiento del estudiante. Si no existe la cuenta, la crea.
+        """
         await conn.execute(
             """
             INSERT INTO cuenta_seguimiento_alumno (id_tenant, id_alumno, creditos_inscritos_periodo)
