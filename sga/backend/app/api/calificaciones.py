@@ -9,15 +9,24 @@ from app.services.calificacion import registrar_calificaciones, publicar_compone
 
 router = APIRouter(prefix="/calificaciones", tags=["Calificaciones"])
 
-# Request Schemas
+# Esquemas de Petición (Request Schemas)
 class CalificacionInput(BaseModel):
+    """
+    Esquema de entrada para el registro individual de calificaciones.
+    """
     id_inscripcion: str = Field(..., description="ID de la inscripción del alumno")
     valor_nota: float = Field(..., ge=0.0, description="Valor numérico de la calificación")
 
 class RegistroCalificacionesRequest(BaseModel):
+    """
+    Esquema de envoltura para procesar un lote de calificaciones en una sola petición.
+    """
     calificaciones: List[CalificacionInput]
 
 class CorreccionRequest(BaseModel):
+    """
+    Esquema de entrada para solicitar una corrección administrativa de nota.
+    """
     valor_nuevo: float = Field(..., ge=0.0, description="Nueva calificación corregida")
     justificacion: str = Field(..., min_length=5, max_length=1000, description="Justificación de la corrección")
 
@@ -30,7 +39,12 @@ def api_registrar_calificaciones(
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Ingresa o actualiza calificaciones de alumnos para un componente de evaluación. (Solo Docente/Admin)
+    Endpoint para ingresar o actualizar calificaciones de estudiantes para un componente en borrador.
+
+    Seguridad y control:
+    - Restringido a Docente asignado a la sección o Administrador.
+    - Manejo transaccional: Tras la ejecución exitosa del caso de uso en la capa de servicios,
+      se realiza el `db.commit()` para persistir el lote de calificaciones.
     """
     calificaciones_in = [{"id_inscripcion": c.id_inscripcion, "valor_nota": Decimal(str(c.valor_nota))} for c in payload.calificaciones]
     res = registrar_calificaciones(db, id_seccion, id_componente, calificaciones_in, user)
@@ -45,7 +59,12 @@ def api_publicar_componente(
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Publica las calificaciones de un componente haciéndolas visibles para los alumnos.
+    Endpoint para publicar de forma oficial las calificaciones de un componente de evaluación.
+
+    Seguridad y control:
+    - Restringido a Docente Coordinador de la sección o Administrador.
+    - Efecto colateral: Las calificaciones cambian a estado PUBLICADO y son visibles para el estudiante.
+    - Manejo transaccional: Confirma los cambios mediante `db.commit()`.
     """
     comp = publicar_componente(db, id_seccion, id_componente, user)
     db.commit()
@@ -59,7 +78,13 @@ def api_corregir_calificacion(
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Corrige una calificación previamente cerrada en un acta de notas. (Solo Administrador)
+    Endpoint para realizar una corrección administrativa de nota sobre un componente cerrado.
+
+    Seguridad y control:
+    - Permitido de forma exclusiva para administradores.
+    - Lógica colateral: Provoca recálculo de la nota final del curso y regeneración del promedio
+      acumulado (PPA) y semestral (PPS) si el período correspondiente ya está cerrado.
+    - Manejo transaccional: Garantiza atomicidad persistiendo los cambios mediante `db.commit()`.
     """
     calif = corregir_calificacion(db, id_calificacion, Decimal(str(payload.valor_nuevo)), payload.justificacion, user)
     db.commit()

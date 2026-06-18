@@ -13,7 +13,12 @@ def api_obtener_historial(
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Obtiene el historial académico consolidado del alumno (notas, promedios y condiciones).
+    Endpoint para obtener el historial académico consolidado en formato JSON.
+
+    Seguridad y acceso:
+    - Si el usuario logueado es ALUMNO, solo puede consultar su propio ID.
+    - Docentes y Administradores tienen acceso irrestricto de consulta.
+    - Muestra detalle de materias agrupadas por períodos, PPS/PPA históricos y alertas activas.
     """
     return obtener_historial_consolidado(db, id_perfil_alumno, user)
 
@@ -24,7 +29,12 @@ def api_descargar_pdf(
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Genera y descarga el récord oficial de notas del alumno en formato PDF.
+    Endpoint para generar y descargar en formato PDF el récord oficial de notas del estudiante.
+
+    Seguridad y respuesta HTTP:
+    - Comparte la misma política de control de accesos que la consulta JSON.
+    - Retorna una respuesta de tipo streaming / bytes con la cabecera `Content-Disposition`
+      configurada como adjunto (attachment) para forzar la descarga en el navegador.
     """
     pdf_content = generar_record_notas_pdf(db, id_perfil_alumno, user)
     

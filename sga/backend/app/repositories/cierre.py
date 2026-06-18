@@ -5,12 +5,19 @@ from app.models.cierre import FormulaPromedio, SnapshotPromedio, CondicionAcadem
 from app.models.core_schemas import PeriodoAcademico
 
 class FormulaPromedioRepository(BaseRepository[FormulaPromedio]):
+    """
+    Repositorio encargado del acceso y persistencia de las fórmulas de promedio (FormulaPromedio).
+    Hereda del repositorio base genérico (BaseRepository).
+    """
     def __init__(self):
         super().__init__(FormulaPromedio)
 
     def get_by_periodo_and_tipo(
         self, db: Session, id_periodo: str, tipo_promedio: str
     ) -> Optional[FormulaPromedio]:
+        """
+        Recupera la fórmula de promedio asignada a un período académico y tipo específico (PPS o PPA).
+        """
         return (
             db.query(FormulaPromedio)
             .filter(
@@ -21,16 +28,22 @@ class FormulaPromedioRepository(BaseRepository[FormulaPromedio]):
         )
 
 class SnapshotPromedioRepository(BaseRepository[SnapshotPromedio]):
+    """
+    Repositorio para el manejo de capturas históricas de promedios (SnapshotPromedio).
+    Hereda del repositorio base genérico (BaseRepository).
+    """
     def __init__(self):
         super().__init__(SnapshotPromedio)
 
     def get_by_alumno_and_periodo(
         self, db: Session, id_perfil_alumno: str, id_periodo: str
     ) -> Optional[SnapshotPromedio]:
-        # Return the latest active snapshot (without snapshot_posterior referencing it)
-        # to allow recalculations to be linked in a chain.
-        # So we look for a snapshot where id_snapshot is NOT present in any other snapshot's id_snapshot_anterior.
-        # But for simpler retrieval, we can order by created_at DESC and take the first.
+        """
+        Recupera el último snapshot de promedio vigente para un alumno en un período determinado.
+        
+        Ordena por fecha de creación descendente para retornar la última versión calculada
+        (por ejemplo, tras una corrección de nota post-cierre).
+        """
         return (
             db.query(SnapshotPromedio)
             .filter(
@@ -45,7 +58,10 @@ class SnapshotPromedioRepository(BaseRepository[SnapshotPromedio]):
         self, db: Session, id_perfil_alumno: str
     ) -> Optional[SnapshotPromedio]:
         """
-        Gets the student's latest snapshot average historically.
+        Recupera el snapshot histórico más reciente del estudiante (el último período cerrado).
+        
+        Realiza un JOIN con PeriodoAcademico para ordenar por la fecha de fin del período
+        y luego por la fecha de creación del snapshot.
         """
         return (
             db.query(SnapshotPromedio)
@@ -56,12 +72,20 @@ class SnapshotPromedioRepository(BaseRepository[SnapshotPromedio]):
         )
 
 class CondicionAcademicaRepository(BaseRepository[CondicionAcademicaAlumno]):
+    """
+    Repositorio para la gestión de las condiciones académicas (CondicionAcademicaAlumno).
+    Hereda del repositorio base genérico (BaseRepository).
+    """
     def __init__(self):
         super().__init__(CondicionAcademicaAlumno)
 
     def get_active_by_alumno(
         self, db: Session, id_perfil_alumno: str
     ) -> List[CondicionAcademicaAlumno]:
+        """
+        Recupera la lista de todas las condiciones académicas que se encuentran 'ACTIVAS'
+        para un estudiante.
+        """
         return (
             db.query(CondicionAcademicaAlumno)
             .filter(
@@ -74,6 +98,10 @@ class CondicionAcademicaRepository(BaseRepository[CondicionAcademicaAlumno]):
     def get_active_by_alumno_and_tipo(
         self, db: Session, id_perfil_alumno: str, id_tipo_condicion: str
     ) -> Optional[CondicionAcademicaAlumno]:
+        """
+        Busca si el alumno tiene una condición académica activa de un tipo específico.
+        Permite validar duplicados antes de gatillar una nueva alerta.
+        """
         return (
             db.query(CondicionAcademicaAlumno)
             .filter(
@@ -87,6 +115,10 @@ class CondicionAcademicaRepository(BaseRepository[CondicionAcademicaAlumno]):
     def get_all_by_alumno(
         self, db: Session, id_perfil_alumno: str
     ) -> List[CondicionAcademicaAlumno]:
+        """
+        Recupera el historial completo de condiciones académicas (tanto activas como resueltas)
+        de un estudiante, ordenadas por fecha de activación descendente.
+        """
         return (
             db.query(CondicionAcademicaAlumno)
             .filter(CondicionAcademicaAlumno.id_perfil_alumno == id_perfil_alumno)

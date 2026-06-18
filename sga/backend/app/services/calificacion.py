@@ -31,17 +31,27 @@ def registrar_calificaciones(
     user: CurrentUser
 ) -> List[Calificacion]:
     """
-    Registra o actualiza calificaciones de alumnos para un componente de evaluación.
-    Solo accesible por Docente asignado a la sección o Administrador.
-    El componente debe estar en estado BORRADOR.
+    Caso de uso: Registra o actualiza calificaciones de estudiantes para un componente de evaluación.
+
+    Reglas de negocio y seguridad:
+    - Control de accesos (RBAC): Solo accesible por un Docente asignado a la sección o un Administrador.
+    - Validación de asignación: Si el usuario es docente, se verifica que esté asignado a la sección
+      (con bypass especial para perfiles de pruebas/desarrollo).
+    - Máquina de estados: El componente de evaluación debe estar en estado 'BORRADOR'.
+    - Consistencia de datos: Las inscripciones de los alumnos deben pertenecer a la sección
+      y no encontrarse en estado 'RETIRADA' o 'ANULADA'.
+    - Rango de escala: Cada calificación se valida contra el rango de la escala de evaluación configurada.
+    - Trazabilidad y transaccionalidad: Registra un log de auditoría. Si ocurre cualquier error,
+      se ejecuta un rollback de la transacción de base de datos.
     """
-    # 1. Authorization
+    # 1. Autorización de Rol
     if user.rol not in ("DOCENTE", "ADMINISTRADOR"):
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
                   "seccion", id_seccion, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No autorizado para registrar calificaciones.")
 
+    # Validación específica para el Docente: verificar asignación en la sección
     if user.rol == "DOCENTE":
         docente_perfil_id = user.id_perfil or ""
         is_assigned = db.query(AsignacionDocenteSeccion).filter(
@@ -54,7 +64,7 @@ def registrar_calificaciones(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="El docente no está asignado a esta sección.")
 
-    # 2. Retrieve ComponenteEvaluacion
+    # 2. Recuperar y validar existencia del Componente de Evaluación
     componente = componente_repo.get(db, id_componente)
     if not componente or componente.id_seccion != id_seccion:
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
@@ -62,7 +72,7 @@ def registrar_calificaciones(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Componente de evaluación no encontrado.")
 
-    # 3. State verification
+    # 3. Verificación de estado de flujo del acta
     if not can_modify_grades(componente.estado):
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
                   "componente", id_componente, "RECHAZADA",
@@ -70,7 +80,7 @@ def registrar_calificaciones(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No se pueden modificar calificaciones en un componente publicado o cerrado.")
 
-    # 4. Fetch scale
+    # 4. Recuperar la escala de evaluación asociada para validar límites
     escala = db.query(EscalaEvaluacion).filter(
         EscalaEvaluacion.id_escala == componente.id_escala
     ).first()
@@ -83,10 +93,12 @@ def registrar_calificaciones(
     res_calificaciones = []
 
     try:
+        # 5. Procesar lote de calificaciones
         for item in calificaciones_in:
             insc_id = item["id_inscripcion"]
             nota_val = Decimal(str(item["valor_nota"]))
 
+            # Validar que la inscripción pertenece a la sección académica
             inscripcion = db.query(Inscripcion).filter(
                 Inscripcion.id_inscripcion == insc_id,
                 Inscripcion.id_seccion == id_seccion
@@ -95,16 +107,17 @@ def registrar_calificaciones(
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                     detail=f"La inscripción {insc_id} no pertenece a esta sección.")
 
+            # Impedir calificar a alumnos retirados o con matrícula anulada
             if inscripcion.estado in ("RETIRADA", "ANULADA"):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"No se puede registrar nota para una inscripción en estado {inscripcion.estado}."
                 )
 
-            # Validate value is within scale range
+            # Validar que el valor numérico esté dentro de la escala
             validate_grade_value(nota_val, escala.nota_minima, escala.nota_maxima)
 
-            # Save or update grade
+            # Guardar en base de datos: Crear o actualizar
             calif = calificacion_repo.get_by_inscripcion_and_componente(db, insc_id, id_componente)
             if calif:
                 calif.valor_nota = nota_val
@@ -123,6 +136,7 @@ def registrar_calificaciones(
 
             res_calificaciones.append(calif)
 
+        # Enviar cambios a la transacción de base de datos sin confirmarlos (commit en API router)
         db.flush()
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
                   "componente", id_componente, "EXITOSA",
@@ -147,9 +161,17 @@ def publicar_componente(
     user: CurrentUser
 ) -> ComponenteEvaluacion:
     """
-    Publica las calificaciones de un componente, haciéndolas visibles para los alumnos.
-    Solo el docente coordinador o Administrador pueden publicar.
+    Caso de uso: Publica las calificaciones de un componente de evaluación.
+
+    Reglas de negocio y flujo:
+    - Hace las notas visibles para los alumnos del portal.
+    - Control de accesos (RBAC): Requiere rol Administrador o ser el Docente Coordinador de la sección.
+    - Máquina de estados: Solo se permite publicar si el componente está actualmente en 'BORRADOR'.
+    - Cascada: Modifica el estado tanto del componente evaluado como de todas las calificaciones
+      individuales asociadas a él a 'PUBLICADO'.
+    - Registra un evento académico inmutable ('EVT-NOTA-COMPONENTE-PUBLICADA') en la bitácora institucional.
     """
+    # 1. Recuperar Componente de Evaluación
     componente = componente_repo.get(db, id_componente)
     if not componente or componente.id_seccion != id_seccion:
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
@@ -157,6 +179,7 @@ def publicar_componente(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Componente de evaluación no encontrado.")
 
+    # 2. Validar transición de estado
     if not can_publish_component(componente.estado):
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
                   "componente", id_componente, "RECHAZADA",
@@ -164,12 +187,14 @@ def publicar_componente(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="El componente ya se encuentra publicado o cerrado.")
 
+    # 3. Control de Accesos
     if user.rol not in ("ADMINISTRADOR", "DOCENTE"):
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
                   "componente", id_componente, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No autorizado para publicar componentes.")
 
+    # Validación adicional para docentes: Debe ser coordinador de la sección académica
     if user.rol == "DOCENTE":
         docente_perfil_id = user.id_perfil or ""
         is_coord = db.query(AsignacionDocenteSeccion).filter(
@@ -185,6 +210,7 @@ def publicar_componente(
                                 detail="Solo el docente coordinador de la sección puede publicar calificaciones.")
 
     try:
+        # 4. Transición de estados en cascada
         componente.estado = "PUBLICADO"
         db.add(componente)
 
@@ -195,6 +221,7 @@ def publicar_componente(
 
         db.flush()
 
+        # Emitir evento del Ciclo de Vida Académico
         create_academic_event(
             db, user.id_tenant, "EVT-NOTA-COMPONENTE-PUBLICADA",
             user.id_usuario, "componente_evaluacion", id_componente
@@ -220,11 +247,24 @@ def corregir_calificacion(
     user: CurrentUser
 ) -> Calificacion:
     """
-    Aplica una corrección administrativa de nota sobre un componente cerrado.
-    Solo ADMINISTRADOR puede autorizar correcciones.
-    Recalcula la nota final de la inscripción y, si el período está cerrado,
-    genera un nuevo SnapshotPromedio vinculado al anterior.
+    Caso de uso: Aplica una corrección administrativa de nota sobre un componente cerrado.
+
+    Reglas de negocio complejas y auditoría:
+    - Control de accesos (RBAC): Únicamente permitida para el rol ADMINISTRADOR.
+    - Máquina de estados: Solo aplica sobre rubros evaluativos que ya estén en estado 'CERRADO'.
+    - Límite de escala: La nota nueva se valida con los límites superior e inferior de la escala.
+    - Trazabilidad e inmutabilidad:
+        1. Crea un evento académico 'EVT-NOTA-CORREGIDA' registrando los valores anterior y nuevo.
+        2. Registra una fila en `correccion_nota` vinculada al evento y al administrador aprobador.
+        3. Modifica el registro de la nota y recalcula la nota final de la inscripción del estudiante.
+        4. Si el estudiante aprueba o reprueba con el recálculo, actualiza su estado de inscripción
+           a 'APROBADA' o 'DESAPROBADA' respectivamente y emite 'EVT-NOTA-FINAL-CALCULADA'.
+        5. Si el Período Académico correspondiente ya se encuentra en estado 'CERRADO',
+           el cambio de nota obliga a recalcular los promedios semestral (PPS) e histórico (PPA)
+           del estudiante y a generar un nuevo `SnapshotPromedio` encadenado al snapshot previo,
+           emitiendo además el evento 'EVT-SNAPSHOT-PROMEDIO'.
     """
+    # 1. Restricción de seguridad
     if user.rol != "ADMINISTRADOR":
         log_audit(db, user.id_tenant, user.id_usuario, "CORREGIR_CALIFICACION",
                   "calificacion", id_calificacion, "RECHAZADA",
@@ -232,7 +272,7 @@ def corregir_calificacion(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Solo los administradores pueden autorizar correcciones de nota.")
 
-    # 1. Fetch grade
+    # 2. Recuperar la calificación
     calif = calificacion_repo.get(db, id_calificacion)
     if not calif:
         log_audit(db, user.id_tenant, user.id_usuario, "CORREGIR_CALIFICACION",
@@ -241,7 +281,7 @@ def corregir_calificacion(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Registro de calificación no encontrado.")
 
-    # 2. Verify component is closed
+    # 3. Validar estado del componente (Acta cerrada)
     componente = componente_repo.get(db, calif.id_componente)
     if not componente or not can_correct_grade(componente.estado):
         log_audit(db, user.id_tenant, user.id_usuario, "CORREGIR_CALIFICACION",
@@ -252,12 +292,13 @@ def corregir_calificacion(
             detail="Las correcciones administrativas solo aplican sobre componentes cerrados."
         )
 
-    # 3. Validate new value
+    # 4. Validar nueva calificación contra los límites de la escala
     escala = db.query(EscalaEvaluacion).filter(
         EscalaEvaluacion.id_escala == componente.id_escala
     ).first()
     validate_grade_value(valor_nuevo, escala.nota_minima, escala.nota_maxima)
 
+    # Evitar registrar una corrección por el mismo valor de nota vigente
     if Decimal(str(calif.valor_nota)) == Decimal(str(valor_nuevo)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="La nueva nota debe ser diferente a la nota actual.")
@@ -265,7 +306,7 @@ def corregir_calificacion(
     valor_anterior = calif.valor_nota
 
     try:
-        # 4. Get enrollment context
+        # 5. Obtener contexto de inscripción, matrícula y estudiante
         inscripcion = db.query(Inscripcion).filter(
             Inscripcion.id_inscripcion == calif.id_inscripcion
         ).first()
@@ -274,7 +315,7 @@ def corregir_calificacion(
         ).first()
         id_perfil_alumno = matricula.id_perfil_alumno
 
-        # 5. Create correction event
+        # 6. Registrar evento de auditoría académica
         event_origen = create_academic_event(
             db=db,
             id_tenant=user.id_tenant,
@@ -287,7 +328,7 @@ def corregir_calificacion(
             valor_nuevo=float(valor_nuevo)
         )
 
-        # 6. Insert CorreccionNota record
+        # 7. Asentar registro administrativo de la corrección
         correccion = CorreccionNota(
             id_calificacion=id_calificacion,
             id_evento_original=event_origen.id_evento,
@@ -298,12 +339,12 @@ def corregir_calificacion(
         )
         db.add(correccion)
 
-        # 7. Apply grade update
+        # 8. Modificar nota
         calif.valor_nota = valor_nuevo
         db.add(calif)
         db.flush()
 
-        # 8. Recalculate final grade for the inscription
+        # 9. Recalcular la nota final promedio ponderada de la asignatura
         todas_calif = db.query(Calificacion).filter(
             Calificacion.id_inscripcion == calif.id_inscripcion
         ).all()
@@ -317,10 +358,12 @@ def corregir_calificacion(
 
         nota_final_calculada = calcular_nota_final(lista_calif_domain)
         inscripcion.nota_final = nota_final_calculada
+        # Evaluar estado de aprobación vigesimal
         inscripcion.estado = "APROBADA" if nota_final_calculada >= escala.nota_aprobatoria else "DESAPROBADA"
         db.add(inscripcion)
         db.flush()
 
+        # Emitir evento de cálculo de nota final corregido
         create_academic_event(
             db=db,
             id_tenant=user.id_tenant,
@@ -333,11 +376,12 @@ def corregir_calificacion(
             valor_nuevo=float(nota_final_calculada)
         )
 
-        # 9. If period is closed, recalculate PPS/PPA and create new snapshot
+        # 10. Recálculo en cascada de promedios si el período académico ya estaba cerrado
         periodo = db.query(PeriodoAcademico).filter(
             PeriodoAcademico.id_periodo == matricula.id_periodo
         ).first()
         if periodo and periodo.estado == "CERRADO":
+            # Obtener las fórmulas parametrizadas del período para PPS y PPA
             formula_pps = db.query(FormulaPromedio).filter(
                 FormulaPromedio.id_periodo == periodo.id_periodo,
                 FormulaPromedio.tipo_promedio == "PPS"
@@ -350,6 +394,7 @@ def corregir_calificacion(
             regla_pps = formula_pps.regla_inclusion if formula_pps else "TODOS"
             regla_ppa = formula_ppa.regla_inclusion if formula_ppa else "TODOS"
 
+            # Obtener inscripciones válidas para el período actual
             ins_periodo = (
                 db.query(Inscripcion)
                 .join(Matricula, Inscripcion.id_matricula == Matricula.id_matricula)
@@ -359,6 +404,7 @@ def corregir_calificacion(
                     Inscripcion.estado.in_(["APROBADA", "DESAPROBADA"])
                 ).all()
             )
+            # Obtener todo el historial de inscripciones válidas para el promedio acumulado
             ins_historicas = (
                 db.query(Inscripcion)
                 .join(Matricula, Inscripcion.id_matricula == Matricula.id_matricula)
@@ -368,6 +414,7 @@ def corregir_calificacion(
                 ).all()
             )
 
+            # Adaptar la lista al formato que requiere el dominio para el cálculo
             def _build_list(inscriptions):
                 result = []
                 for ins in inscriptions:
@@ -382,9 +429,11 @@ def corregir_calificacion(
                         })
                 return result
 
+            # Calcular los promedios actualizados usando las funciones de dominio
             nuevo_pps = calcular_promedio_ponderado(_build_list(ins_periodo), regla_pps)
             nuevo_ppa = calcular_promedio_ponderado(_build_list(ins_historicas), regla_ppa)
 
+            # Encontrar el snapshot más reciente del alumno para este período académico
             prev_snapshot = (
                 db.query(SnapshotPromedio)
                 .filter(
@@ -395,6 +444,7 @@ def corregir_calificacion(
                 .first()
             )
 
+            # Generar el nuevo snapshot inmutable encadenado
             new_snapshot = SnapshotPromedio(
                 id_perfil_alumno=id_perfil_alumno,
                 id_periodo=periodo.id_periodo,
@@ -408,6 +458,7 @@ def corregir_calificacion(
             db.add(new_snapshot)
             db.flush()
 
+            # Registrar el evento académico del nuevo promedio recalculado
             create_academic_event(
                 db=db,
                 id_tenant=user.id_tenant,

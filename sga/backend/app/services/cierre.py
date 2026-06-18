@@ -30,23 +30,37 @@ def cerrar_acta_seccion(
     user: CurrentUser
 ) -> List[Inscripcion]:
     """
-    Cierra de forma definitiva el acta de calificaciones de una sección.
-    Calcula la nota final de cada inscripción activa y determina si aprueba o desaprueba.
-    Operación transaccional: todos los cambios ocurren juntos o ninguno persiste.
+    Caso de uso: Cierra de forma definitiva el acta de calificaciones de una sección.
+
+    Reglas de negocio y flujo transaccional:
+    - Control de accesos (RBAC): Permitido para Administradores o para el Docente Coordinador de la sección.
+    - Consistencia del acta: Verifica que existan componentes de evaluación configurados y que
+      TODOS ellos se encuentren previamente en estado 'PUBLICADO'.
+    - Lógica de cálculo final por estudiante:
+        1. Para cada estudiante con inscripción 'ACTIVA', recupera sus calificaciones de cada componente.
+        2. Llama a `calcular_nota_final` en la capa de dominio aplicando los pesos relativos de la escala.
+        3. Compara contra la nota aprobatoria establecida en la escala para definir el estado de la inscripción:
+           'APROBADA' (emite 'EVT-NOTA-FINAL-CALCULADA') o 'DESAPROBADA' (emite 'EVT-NOTA-FINAL-CALCULADA'
+           y además 'EVT-REPROBO-CURSO' para el conteo de desaprobaciones en la cuenta del alumno).
+    - Cierre en cascada: Modifica el estado de todos los componentes evaluativos a 'CERRADO'.
+    - Transaccionalidad: Toda la operación se realiza bajo la misma sesión de base de datos;
+      cualquier excepción gatilla rollback automático para evitar actas con cierres parciales.
+    - Auditoría: Emite el evento global institucional 'EVT-ACTA-CERRADA' y guarda log en `registro_auditoria`.
     """
-    # 1. Fetch section
+    # 1. Recuperar la sección académica
     seccion = db.query(Seccion).filter(Seccion.id_seccion == id_seccion).first()
     if not seccion:
         log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_ACTA", "seccion",
                   id_seccion, "RECHAZADA", motivo_rechazo="Sección no encontrada.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sección no encontrada.")
 
-    # 2. Authorization: admin or coordinator teacher
+    # 2. Control de accesos (RBAC)
     if user.rol not in ("ADMINISTRADOR", "DOCENTE"):
         log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_ACTA", "seccion",
                   id_seccion, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No autorizado para cerrar actas.")
 
+    # Validación adicional para docentes: Debe ser coordinador de la sección
     if user.rol == "DOCENTE":
         is_coord = db.query(AsignacionDocenteSeccion).filter(
             AsignacionDocenteSeccion.id_seccion == id_seccion,
@@ -61,7 +75,7 @@ def cerrar_acta_seccion(
                 detail="Solo el docente coordinador de la sección puede cerrar el acta."
             )
 
-    # 3. Retrieve all evaluation components
+    # 3. Recuperar componentes de evaluación de la sección
     componentes = componente_repo.get_by_seccion(db, id_seccion)
     if not componentes:
         log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_ACTA", "seccion",
@@ -71,7 +85,7 @@ def cerrar_acta_seccion(
             detail="No hay componentes de evaluación configurados en esta sección."
         )
 
-    # 4. Verify all components are PUBLICADO
+    # 4. Asegurar que todas las actas/componentes parciales estén publicados
     for c in componentes:
         if c.estado != "PUBLICADO":
             log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_ACTA", "seccion",
@@ -81,12 +95,13 @@ def cerrar_acta_seccion(
                 detail="Todos los componentes de evaluación deben estar publicados antes de cerrar el acta."
             )
 
-    # 5. Fetch all active student inscriptions
+    # 5. Obtener inscripciones de alumnos en la sección
     inscriptions = db.query(Inscripcion).filter(
         Inscripcion.id_seccion == id_seccion,
         Inscripcion.estado == "ACTIVA"
     ).all()
 
+    # Si no hay inscripciones activas, se realiza un cierre rápido de las actas vacías
     if not inscriptions:
         for c in componentes:
             c.estado = "CERRADO"
@@ -96,12 +111,12 @@ def cerrar_acta_seccion(
                   id_seccion, "EXITOSA", valor_nuevo={"inscriptions_count": 0})
         return []
 
-    # Fetch grading scale
+    # Recuperar escala de notas del primer componente (se asume homogénea para la sección)
     id_escala = componentes[0].id_escala
     escala = db.query(EscalaEvaluacion).filter(EscalaEvaluacion.id_escala == id_escala).first()
 
     try:
-        # 6. Calculate final grade and update state for each student
+        # 6. Calcular notas finales individuales y generar eventos académicos
         for ins in inscriptions:
             grades_list = []
             for comp in componentes:
@@ -111,11 +126,13 @@ def cerrar_acta_seccion(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"Faltan calificaciones para la inscripción {ins.id_inscripcion}."
                     )
+                # Formato esperado por el dominio de cálculos
                 grades_list.append({
                     "valor_nota": cal.valor_nota,
                     "peso_relativo": comp.peso_relativo
                 })
 
+            # Calcular el promedio de componentes
             nota_final = calcular_nota_final(grades_list)
             ins.nota_final = nota_final
 
@@ -123,6 +140,7 @@ def cerrar_acta_seccion(
             id_curso = seccion.id_curso
             id_periodo = seccion.id_periodo
 
+            # Evaluar aprobación vigesimal y disparar la cascada de eventos correspondientes
             if nota_final >= escala.nota_aprobatoria:
                 ins.estado = "APROBADA"
                 create_academic_event(
@@ -134,6 +152,7 @@ def cerrar_acta_seccion(
                     entidad_afectada_id=ins.id_inscripcion,
                     id_perfil_alumno=id_perfil_alumno,
                     valor_anterior=None,
+                    # Se incluye créditos obtenidos para la actualización de cuentas de seguimiento
                     valor_nuevo={"nota_final": float(nota_final), "creditos": float(seccion.curso.creditos)},
                     id_periodo_ref=id_periodo,
                     id_curso_ref=id_curso
@@ -153,6 +172,7 @@ def cerrar_acta_seccion(
                     id_periodo_ref=id_periodo,
                     id_curso_ref=id_curso
                 )
+                # Emitir evento específico de reprobación para incrementar la cuenta de deméritos/desaprobaciones
                 create_academic_event(
                     db=db,
                     id_tenant=user.id_tenant,
@@ -170,14 +190,14 @@ def cerrar_acta_seccion(
             ins.fecha_cambio_estado = datetime.now(timezone.utc)
             db.add(ins)
 
-        # 7. Close all components
+        # 7. Asentar estado CERRADO en todos los componentes
         for c in componentes:
             c.estado = "CERRADO"
             db.add(c)
 
         db.flush()
 
-        # 8. Emit EVT-ACTA-CERRADA
+        # Emitir evento del acta general cerrada
         create_academic_event(
             db, user.id_tenant, "EVT-ACTA-CERRADA",
             user.id_usuario, "seccion", id_seccion
@@ -206,11 +226,30 @@ def cerrar_periodo_academico(
     user: CurrentUser
 ) -> PeriodoAcademico:
     """
-    Cierra un período académico.
-    Para cada alumno matriculado calcula PPS y PPA, genera un SnapshotPromedio,
-    y evalúa las políticas de condición académica configuradas para el período.
-    Cada alumno se procesa en la misma transacción de sesión; un fallo aborta todo el lote.
+    Caso de uso: Cierra de forma definitiva un período académico (procesamiento en lote).
+
+    Reglas de negocio y procesamiento batch:
+    - Control de accesos (RBAC): Permitido únicamente para el rol ADMINISTRADOR.
+    - Consistencia académica previa: Se verifica que todas las secciones del período tengan
+      sus componentes de evaluación en estado 'CERRADO'. Si hay actas abiertas, se rechaza la operación.
+    - Flujo en lote para estudiantes matriculados en el período:
+        1. Recupera todos los estudiantes con matrícula activa en el período.
+        2. Calcula el PPS (Promedio Ponderado Semestral) del alumno usando las inscripciones del período
+           y la fórmula/regla de inclusión de PPS correspondiente.
+        3. Calcula el PPA (Promedio Ponderado Acumulado) histórico sumando inscripciones de todos sus períodos
+           y la regla de PPA configurada.
+        4. Crea un `SnapshotPromedio` y emite 'EVT-SNAPSHOT-PROMEDIO'.
+        5. Evalúa las políticas de condiciones académicas configuradas para el período.
+           * Llama a `evaluar_politica_condicion` comparando el valor de la cuenta de seguimiento (e.g., desaprobaciones)
+             contra el umbral de la regla mediante el operador lógico correspondiente.
+           * Si la regla se cumple y el alumno no posee la condición activa, inserta una nueva `CondicionAcademicaAlumno`
+             en estado 'ACTIVA' y emite 'EVT-CONDICION-ACTIVADA'.
+           * Si la regla ya no se cumple (por ejemplo, el alumno superó el rendimiento mínimo), cambia el estado
+             de la condición académica activa a 'RESUELTA' y emite 'EVT-CONDICION-RESUELTA'.
+    - Transaccionalidad fuerte: Todo el procesamiento por lotes se ejecuta en un solo bloque transaccional.
+      Un solo error en cualquier alumno aborta completamente el proceso de cierre para mantener coherencia e integridad global.
     """
+    # 1. Validación de privilegios
     if user.rol != "ADMINISTRADOR":
         log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_PERIODO", "periodo_academico",
                   id_periodo, "RECHAZADA", motivo_rechazo="Rol no es Administrador.")
@@ -219,13 +258,14 @@ def cerrar_periodo_academico(
             detail="Solo los administradores pueden cerrar períodos académicos."
         )
 
-    # 1. Fetch period
+    # 2. Recuperar período
     periodo = db.query(PeriodoAcademico).filter(PeriodoAcademico.id_periodo == id_periodo).first()
     if not periodo:
         log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_PERIODO", "periodo_academico",
                   id_periodo, "RECHAZADA", motivo_rechazo="Período no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Período académico no encontrado.")
 
+    # El período debe encontrarse en etapa de digitación o registro de notas
     if periodo.estado != "REGISTRO_NOTAS":
         log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_PERIODO", "periodo_academico",
                   id_periodo, "RECHAZADA", motivo_rechazo="Período no está en REGISTRO_NOTAS.")
@@ -234,7 +274,7 @@ def cerrar_periodo_academico(
             detail="El período debe estar en estado REGISTRO_NOTAS antes de cerrarse."
         )
 
-    # 2. Verify all evaluation components are closed
+    # 3. Control de actas: Validar que todas las secciones estén cerradas
     sections = db.query(Seccion).filter(Seccion.id_periodo == id_periodo).all()
     for s in sections:
         components = db.query(ComponenteEvaluacion).filter(
@@ -255,14 +295,14 @@ def cerrar_periodo_academico(
                     )
                 )
 
-    # 3. Transition period state to CERRADO
+    # 4. Transicionar estado del período
     periodo.estado = "CERRADO"
     periodo.fecha_estado_actual = datetime.now(timezone.utc)
     periodo.id_usuario_transicion = user.id_usuario
     db.add(periodo)
     db.flush()
 
-    # 4. Fetch all active students enrolled in this period
+    # 5. Obtener estudiantes activos con matrícula en este período
     alumnos = (
         db.query(PerfilAlumno)
         .join(Matricula, Matricula.id_perfil_alumno == PerfilAlumno.id_perfil_alumno)
@@ -270,7 +310,7 @@ def cerrar_periodo_academico(
         .all()
     )
 
-    # Fetch calculation formulas
+    # Recuperar fórmulas del período
     formula_pps = db.query(FormulaPromedio).filter(
         FormulaPromedio.id_periodo == id_periodo, FormulaPromedio.tipo_promedio == "PPS"
     ).first()
@@ -282,15 +322,15 @@ def cerrar_periodo_academico(
     regla_ppa = formula_ppa.regla_inclusion if formula_ppa else "TODOS"
     id_formula_aplicada = formula_pps.id_formula if formula_pps else None
 
-    # Fetch active academic policies for this period
+    # Obtener las políticas activas de condiciones académicas configuradas para el período
     politicas = db.query(PoliticaCondicionAcademica).filter(
         PoliticaCondicionAcademica.id_periodo == id_periodo
     ).all()
 
     try:
-        # 5. Process each student
+        # 6. Procesar a cada estudiante en lote
         for al in alumnos:
-            # Period inscriptions
+            # Recuperar materias inscritas en el período actual
             ins_periodo = (
                 db.query(Inscripcion)
                 .join(Matricula, Inscripcion.id_matricula == Matricula.id_matricula)
@@ -300,7 +340,7 @@ def cerrar_periodo_academico(
                     Inscripcion.estado.in_(["APROBADA", "DESAPROBADA"])
                 ).all()
             )
-            # Historical inscriptions (all periods)
+            # Recuperar materias de toda la historia académica del estudiante
             ins_historicas = (
                 db.query(Inscripcion)
                 .join(Matricula, Inscripcion.id_matricula == Matricula.id_matricula)
@@ -310,6 +350,7 @@ def cerrar_periodo_academico(
                 ).all()
             )
 
+            # Convertir al formato mapeado esperado por la lógica pura de dominio
             def _build_domain_list(inscriptions):
                 result = []
                 for ins in inscriptions:
@@ -324,10 +365,11 @@ def cerrar_periodo_academico(
                         })
                 return result
 
+            # Invocar reglas del dominio para el cálculo ponderado de PPS y PPA
             pps_calc = calcular_promedio_ponderado(_build_domain_list(ins_periodo), regla_pps)
             ppa_calc = calcular_promedio_ponderado(_build_domain_list(ins_historicas), regla_ppa)
 
-            # Link to previous snapshot if exists
+            # Buscar snapshot previo para enlazar la auditoría
             prev_snapshot = (
                 db.query(SnapshotPromedio)
                 .filter(
@@ -338,6 +380,7 @@ def cerrar_periodo_academico(
                 .first()
             )
 
+            # Registrar el snapshot oficial e inmutable de promedios ponderados
             snapshot = SnapshotPromedio(
                 id_perfil_alumno=al.id_perfil_alumno,
                 id_periodo=id_periodo,
@@ -350,6 +393,7 @@ def cerrar_periodo_academico(
             db.add(snapshot)
             db.flush()
 
+            # Emitir evento de generación del snapshot
             create_academic_event(
                 db=db,
                 id_tenant=user.id_tenant,
@@ -363,7 +407,7 @@ def cerrar_periodo_academico(
                 id_periodo_ref=id_periodo
             )
 
-            # 6. Evaluate academic condition policies
+            # 7. Evaluar políticas de condición académica automática
             active_conditions = (
                 db.query(CondicionAcademicaAlumno)
                 .filter(
@@ -373,18 +417,21 @@ def cerrar_periodo_academico(
             )
 
             for pol in politicas:
+                # Recuperar el valor actual de la métrica del estudiante (e.g. créditos desaprobados)
                 cuenta = db.query(CuentaSeguimientoAlumno).filter(
                     CuentaSeguimientoAlumno.id_perfil_alumno == al.id_perfil_alumno,
                     CuentaSeguimientoAlumno.tipo_cuenta == pol.cuenta_evaluada
                 ).first()
                 valor_cuenta = cuenta.valor_actual if cuenta else Decimal("0.00")
 
+                # Evaluar regla de comparación en dominio
                 triggered = evaluar_politica_condicion(valor_cuenta, pol.umbral, pol.operador)
 
                 if triggered:
                     already_active = any(
                         c.id_tipo_condicion == pol.id_tipo_condicion for c in active_conditions
                     )
+                    # Si califica para la alerta y no la tiene activa, se gatilla la activación
                     if not already_active:
                         tipo_cond = db.query(CoreTipoCondicion).filter(
                             CoreTipoCondicion.id_tipo_condicion == pol.id_tipo_condicion
@@ -404,6 +451,7 @@ def cerrar_periodo_academico(
                             id_periodo_ref=id_periodo
                         )
 
+                        # Insertar la condición
                         new_cond = CondicionAcademicaAlumno(
                             id_perfil_alumno=al.id_perfil_alumno,
                             id_tipo_condicion=pol.id_tipo_condicion,
@@ -416,11 +464,13 @@ def cerrar_periodo_academico(
                         db.add(new_cond)
                         db.flush()
 
+                        # Vincular el ID definitivo en el evento académico
                         event_cond.entidad_afectada_id = new_cond.id_condicion
                         db.add(event_cond)
                         db.flush()
                 else:
-                    # Resolve any active condition of this type if threshold no longer met
+                    # Si la condición está activa pero el estudiante ya no cumple con el criterio de riesgo,
+                    # se procede a resolver automáticamente su situación.
                     for ac in active_conditions:
                         if ac.id_tipo_condicion == pol.id_tipo_condicion:
                             ac.estado = "RESUELTA"
@@ -439,7 +489,7 @@ def cerrar_periodo_academico(
                                 id_periodo_ref=id_periodo
                             )
 
-        # 7. Emit period closed event
+        # 8. Emitir evento del período académico cerrado global
         create_academic_event(
             db, user.id_tenant, "EVT-PERIODO-CERRADO",
             user.id_usuario, "periodo_academico", id_periodo
