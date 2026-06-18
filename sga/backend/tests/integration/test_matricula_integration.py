@@ -264,6 +264,7 @@ class TestMatriculaIntegracion:
         assert ins.status_code == 201
         inscripcion_id = ins.json()["id"]
         creditos_curso = ins.json()["creditos"]
+        assert creditos_curso > 0
 
         vacantes_ocupadas = db.scalar(
             "SELECT vacantes_disponibles FROM seccion WHERE id = :id",
