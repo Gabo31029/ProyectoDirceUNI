@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { authService } from '../services/authService'
-import ErrorAlert from '../components/ErrorAlert'
 
 const ROLE_REDIRECT = {
   ADMIN_CENTRAL: '/admin-central',
@@ -30,14 +29,12 @@ export default function LoginPage() {
         form.password,
         form.dominio_tenant || undefined
       )
-      // fetch user info to get nombre/apellido
-      // Store token first so /me can authenticate
       login({ ...data, nombre: '', apellido: '' })
       try {
         const me = await authService.me()
         login({ ...data, nombre: me.nombre, apellido: me.apellido })
       } catch {
-        // ignore, login is valid
+        // ignore
       }
       navigate(ROLE_REDIRECT[data.rol] || '/')
     } catch (err) {
@@ -49,85 +46,93 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-bg-gradient" />
-      <div className="login-card">
-        <div className="login-logo">
-          <div className="logo-icon" style={{ width: 44, height: 44, fontSize: '1.3rem' }}>S</div>
-          <div>
-            <div className="login-title">SGA</div>
-            <div className="login-subtitle">Sistema de Gestión Académica</div>
-          </div>
+    <div className="auth-stage">
+      <div className="auth-card fade-in">
+        {/* Logo centrado */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div className="auth-logo">S</div>
+          <div className="h2" style={{ marginBottom: 4 }}>SGA</div>
+          <div className="caption">Sistema de Gestión Académica</div>
         </div>
 
-        <h1 style={{ fontSize: '1.25rem', marginBottom: 24 }}>Iniciar sesión</h1>
+        <div className="card card-pad" style={{ padding: '26px' }}>
+          {error && (
+            <div className="banner banner-danger" style={{ marginBottom: 16 }}>
+              <span style={{ flex: 1 }}>⚠ {error}</span>
+              <button
+                onClick={() => setError('')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: '1rem', padding: 0 }}
+                aria-label="Cerrar"
+              >×</button>
+            </div>
+          )}
 
-        <ErrorAlert message={error} onClose={() => setError('')} />
+          <form onSubmit={handleSubmit} noValidate>
+            <div className="field" style={{ marginBottom: 14 }}>
+              <label className="label" htmlFor="email">Correo electrónico</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                className="input"
+                placeholder="usuario@institución.edu"
+                value={form.email}
+                onChange={handleChange}
+                required
+                autoComplete="email"
+              />
+            </div>
 
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">Correo electrónico</label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              className="form-input"
-              placeholder="usuario@institución.edu"
-              value={form.email}
-              onChange={handleChange}
-              required
-              autoComplete="email"
-            />
-          </div>
+            <div className="field" style={{ marginBottom: 14 }}>
+              <label className="label" htmlFor="password">Contraseña</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                className="input"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={handleChange}
+                required
+                autoComplete="current-password"
+              />
+            </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">Contraseña</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              className="form-input"
-              placeholder="Mínimo 8 caracteres"
-              value={form.password}
-              onChange={handleChange}
-              required
-              autoComplete="current-password"
-            />
-          </div>
+            <div className="field" style={{ marginBottom: 20 }}>
+              <label className="label" htmlFor="dominio_tenant">
+                Dominio institucional{' '}
+                <span style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                  (Docentes y Alumnos)
+                </span>
+              </label>
+              <input
+                id="dominio_tenant"
+                name="dominio_tenant"
+                type="text"
+                className="input"
+                placeholder="ej: mi-universidad"
+                value={form.dominio_tenant}
+                onChange={handleChange}
+                autoComplete="off"
+              />
+            </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="dominio_tenant">
-              Dominio institucional{' '}
-              <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-                (para Docentes y Alumnos)
-              </span>
-            </label>
-            <input
-              id="dominio_tenant"
-              name="dominio_tenant"
-              type="text"
-              className="form-input"
-              placeholder="ej: mi-universidad"
-              value={form.dominio_tenant}
-              onChange={handleChange}
-              autoComplete="off"
-            />
-          </div>
+            <button
+              id="btn-login-submit"
+              type="submit"
+              className="btn btn-primary btn-block btn-lg"
+              disabled={loading}
+            >
+              {loading ? 'Autenticando…' : 'Iniciar sesión →'}
+            </button>
+          </form>
+        </div>
 
-          <button
-            id="btn-login-submit"
-            type="submit"
-            className="btn btn-primary w-full"
-            style={{ marginTop: 8, justifyContent: 'center', padding: '12px' }}
-            disabled={loading}
-          >
-            {loading ? 'Autenticando...' : 'Ingresar al sistema'}
-          </button>
-        </form>
-
-        <p style={{ textAlign: 'center', marginTop: 24, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Sistema de gestión académica — Grupo 4 &mdash; 2026-I
-        </p>
+        <div style={{ textAlign: 'center', marginTop: 20 }}>
+          <span className="caption">
+            Plataforma multi-institucional <strong style={{ color: 'var(--ink-2)' }}>SGA</strong> · 2026-I
+          </span>
+        </div>
       </div>
     </div>
   )
