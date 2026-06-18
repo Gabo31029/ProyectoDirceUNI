@@ -1,0 +1,57 @@
+{
+    "_id": "e1111111-1111-1111-1111-111111111111",
+    "name": "SGA Local",
+    "default": true,
+    "sortNum": 10000,
+    "created": "2026-06-03T12:00:00.000Z",
+    "data": [
+        {
+            "name": "baseUrl",
+            "value": "http://localhost:8000"
+        },
+        {
+            "name": "dominio_tenant",
+            "value": "uni-demo"
+        },
+        {
+            "name": "email_alumno",
+            "value": "alumno@uni-demo.local"
+        },
+        {
+            "name": "password_alumno",
+            "value": "AlumnoDemo123!"
+        },
+        {
+            "name": "email_admin",
+            "value": "admin@uni-demo.local"
+        },
+        {
+            "name": "password_admin",
+            "value": "AdminDemo123!"
+        },
+        {
+            "name": "access_token",
+            "value": ""
+        },
+        {
+            "name": "alumno_id",
+            "value": ""
+        },
+        {
+            "name": "id_periodo",
+            "value": ""
+        },
+        {
+            "name": "id_seccion",
+            "value": ""
+        },
+        {
+            "name": "matricula_id",
+            "value": ""
+        },
+        {
+            "name": "inscripcion_id",
+            "value": ""
+        }
+    ]
+}
