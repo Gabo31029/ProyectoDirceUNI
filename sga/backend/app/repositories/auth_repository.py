@@ -113,7 +113,7 @@ class AuthRepository:
         async with self.pool.acquire() as conn:
             await conn.execute(
                 "INSERT INTO token_blacklist (jti, expira_en) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-                jti,
+                str(jti),
                 expira_en,
             )
 
@@ -121,7 +121,7 @@ class AuthRepository:
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(
                 "SELECT 1 FROM token_blacklist WHERE jti = $1 AND expira_en > NOW()",
-                jti,
+                str(jti),
             )
             return row is not None
 

@@ -1,44 +1,45 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { authService } from '../services/authService'
+import Icon from './Icon'
 
 const NAV_BY_ROL = {
   ADMIN_CENTRAL: [
     { section: 'Principal', items: [
-      { to: '/admin-central', icon: '🏠', label: 'Dashboard', id: 'nav-dashboard' },
-      { to: '/admin-central/tenants', icon: '🏛️', label: 'Instituciones', id: 'nav-tenants' },
-      { to: '/admin-central/catalogos', icon: '📚', label: 'Catálogos', id: 'nav-catalogos' },
+      { to: '/admin-central', icon: 'grid', label: 'Dashboard' },
+      { to: '/admin-central/tenants', icon: 'building', label: 'Instituciones' },
+      { to: '/admin-central/catalogos', icon: 'library', label: 'Catálogos' },
     ]},
   ],
   ADMIN: [
-    { section: 'Principal', items: [
-      { to: '/admin', icon: '🏠', label: 'Dashboard', id: 'nav-dashboard' },
-    ]},
-    { section: 'Gestión Académica', items: [
-      { to: '/admin/periodos', icon: '📅', label: 'Períodos', id: 'nav-periodos' },
-      { to: '/admin/oferta', icon: '📖', label: 'Oferta Académica', id: 'nav-oferta' },
-      { to: '/admin/cierre', icon: '🔒', label: 'Cierre Académico', id: 'nav-cierre' },
+    { section: 'General', items: [
+      { to: '/admin', icon: 'grid', label: 'Panel principal' },
+      { to: '/admin/periodos', icon: 'calendar', label: 'Períodos académicos' },
     ]},
     { section: 'Configuración', items: [
-      { to: '/admin/usuarios', icon: '👥', label: 'Usuarios', id: 'nav-usuarios' },
+      { to: '/admin/oferta', icon: 'document', label: 'Oferta académica' },
+      { to: '/admin/usuarios', icon: 'users', label: 'Usuarios' },
+    ]},
+    { section: 'Académico', items: [
+      { to: '/admin/cierre', icon: 'lock', label: 'Cierre académico' },
     ]},
   ],
   DOCENTE: [
     { section: 'Principal', items: [
-      { to: '/docente', icon: '🏠', label: 'Dashboard', id: 'nav-dashboard' },
-      { to: '/docente/calificaciones', icon: '📝', label: 'Calificaciones', id: 'nav-calificaciones' },
+      { to: '/docente', icon: 'grid', label: 'Mis secciones' },
+      { to: '/docente/calificaciones', icon: 'clipboard', label: 'Calificaciones' },
     ]},
   ],
   ALUMNO: [
     { section: 'Principal', items: [
-      { to: '/alumno', icon: '🏠', label: 'Dashboard', id: 'nav-dashboard' },
-      { to: '/alumno/matricula', icon: '📋', label: 'Matrícula', id: 'nav-matricula' },
-      { to: '/alumno/historial', icon: '🎓', label: 'Historial Académico', id: 'nav-historial' },
+      { to: '/alumno', icon: 'grid', label: 'Inicio' },
+      { to: '/alumno/matricula', icon: 'clipboard', label: 'Matrícula' },
+      { to: '/alumno/historial', icon: 'graduation-cap', label: 'Historial académico' },
     ]},
   ],
 }
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed, onToggle }) {
   const { auth, logout } = useAuth()
   const navigate = useNavigate()
   const sections = NAV_BY_ROL[auth?.rol] || []
@@ -49,58 +50,52 @@ export default function Sidebar() {
     navigate('/login')
   }
 
-  const initials = [auth?.nombre?.[0], auth?.apellido?.[0]].filter(Boolean).join('').toUpperCase() || '?'
-
   return (
-    <aside className="sidebar">
-      <div className="sidebar-logo">
-        <div className="sidebar-logo-mark">
-          <div className="logo-icon">S</div>
-          <div>
-            <div className="logo-text">SGA</div>
-            <div className="logo-subtitle">Gestión Académica</div>
-          </div>
+    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
+      <div className="brandbox">
+        <div className="brand-logo">S</div>
+        <div className="brand-meta">
+          <div className="brand-name">SGA</div>
+          <div className="brand-sub">Gestión Académica</div>
         </div>
       </div>
 
-      <nav className="sidebar-nav">
-        {sections.map(sec => (
-          <div key={sec.section}>
-            <div className="nav-section-label">{sec.section}</div>
+      <nav className="nav">
+        {sections.map((sec, gi) => (
+          <div className="nav-group" key={gi}>
+            {sec.section && (
+              <div className="nav-label eyebrow">{sec.section}</div>
+            )}
             {sec.items.map(item => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to.split('/').length <= 2}
-                id={item.id}
                 className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+                title={item.label}
               >
-                <span className="nav-icon">{item.icon}</span>
-                {item.label}
+                <span className="ic"><Icon name={item.icon} size={16} /></span>
+                <span className="lbl">{item.label}</span>
               </NavLink>
             ))}
           </div>
         ))}
       </nav>
 
-      <div className="sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 4px', marginBottom: 8 }}>
-          <div className="user-avatar" style={{ width: 36, height: 36 }}>{initials}</div>
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <div className="user-name" style={{ fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {auth?.nombre} {auth?.apellido}
-            </div>
-            <div className="user-role">{auth?.rol}</div>
-          </div>
-        </div>
-        <button
-          id="btn-logout"
-          className="btn btn-ghost w-full"
-          style={{ justifyContent: 'flex-start', color: 'var(--danger)', fontSize: '0.85rem' }}
+      <div className="sidebar-foot">
+        <div
+          className="nav-item"
           onClick={handleLogout}
+          id="btn-logout"
+          style={{ color: 'var(--red)' }}
         >
-          🚪 Cerrar sesión
-        </button>
+          <span className="ic"><Icon name="logout" size={16} /></span>
+          <span className="lbl">Cerrar sesión</span>
+        </div>
+        <div className="nav-item" onClick={onToggle} title={collapsed ? 'Expandir' : 'Contraer'}>
+          <span className="ic"><Icon name={collapsed ? 'chevron-right' : 'chevron-left'} size={16} /></span>
+          <span className="lbl">Contraer menú</span>
+        </div>
       </div>
     </aside>
   )

@@ -115,7 +115,7 @@ export default function UsuariosPage() {
                 className="btn btn-secondary btn-sm"
                 onClick={() => openEdit(row)}
               >
-                ✏️ Editar
+                Editar
               </button>
               {row.activo && (
                 <button
@@ -123,7 +123,7 @@ export default function UsuariosPage() {
                   className="btn btn-danger btn-sm"
                   onClick={() => handleDesactivar(row)}
                 >
-                  🚫 Desactivar
+                  Desactivar
                 </button>
               )}
             </>

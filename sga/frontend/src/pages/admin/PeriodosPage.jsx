@@ -278,7 +278,7 @@ export default function PeriodosPage() {
                 className="btn btn-secondary btn-sm"
                 onClick={() => openPoliticas(row)}
               >
-                ⚙️ Políticas
+                Políticas
               </button>
               {nextEstado(row.estado) && (
                 <button
@@ -286,7 +286,7 @@ export default function PeriodosPage() {
                   className="btn btn-primary btn-sm"
                   onClick={() => { setSelectedPeriodo(row); setTransEstado(nextEstado(row.estado)); setShowTransModal(true) }}
                 >
-                  ▶️ {nextEstado(row.estado)}
+                  {nextEstado(row.estado)}
                 </button>
               )}
             </>
@@ -341,7 +341,6 @@ export default function PeriodosPage() {
           >
             <ErrorAlert message={error} onClose={() => setError('')} />
             <div className="alert alert-warning">
-              <span>⚠️</span>
               <span>
                 Vas a transicionar <strong>{selectedPeriodo.nombre_periodo}</strong> de{' '}
                 <strong>{selectedPeriodo.estado}</strong> → <strong>{transEstado}</strong>.<br />

@@ -106,14 +106,14 @@ export default function TenantsPage() {
                 className="btn btn-secondary btn-sm"
                 onClick={() => openEdit(row)}
               >
-                ✏️ Editar
+                Editar
               </button>
               <button
                 id={`btn-toggle-tenant-${row.id}`}
                 className={`btn btn-sm ${row.estado === 'ACTIVO' ? 'btn-danger' : 'btn-primary'}`}
                 onClick={() => toggleEstado(row)}
               >
-                {row.estado === 'ACTIVO' ? '⏸️ Desactivar' : '▶️ Activar'}
+                {row.estado === 'ACTIVO' ? 'Desactivar' : 'Activar'}
               </button>
             </>
           )}

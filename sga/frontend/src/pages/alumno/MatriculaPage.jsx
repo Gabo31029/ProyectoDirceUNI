@@ -138,7 +138,6 @@ export default function MatriculaPage() {
         {/* Estado del período */}
         {periodo && (
           <div className={`alert ${periodo.estado === 'MATRICULA' ? 'alert-success' : 'alert-info'} mb-6`}>
-            <span>{periodo.estado === 'MATRICULA' ? '✅' : 'ℹ️'}</span>
             <span>
               Período <strong>{periodo.nombre_periodo}</strong> en estado{' '}
               <Badge value={periodo.estado} />.
@@ -153,7 +152,7 @@ export default function MatriculaPage() {
         ) : !matriculaActiva ? (
           <div className="card">
             <div className="empty-state">
-              <span className="empty-state-icon">📋</span>
+              <span className="empty-state-icon"></span>
               <span className="empty-state-title">Sin matrícula activa</span>
               <span className="empty-state-text">
                 {periodo?.estado === 'MATRICULA'
@@ -166,7 +165,7 @@ export default function MatriculaPage() {
           <>
             {/* Info de matrícula */}
             <div className="card mb-6">
-              <h3 style={{ marginBottom: 16 }}>📋 Información de Matrícula</h3>
+              <h3 style={{ marginBottom: 16 }}>Información de Matrícula</h3>
               <div className="info-grid">
                 <div className="info-item">
                   <div className="info-label">Estado</div>
@@ -190,7 +189,7 @@ export default function MatriculaPage() {
               </div>
               {inscripciones.length === 0 ? (
                 <div className="empty-state">
-                  <span className="empty-state-icon">📚</span>
+                  <span className="empty-state-icon"></span>
                   <span className="empty-state-title">Sin inscripciones</span>
                   <span className="empty-state-text">Inscríbete en secciones disponibles</span>
                 </div>
@@ -221,7 +220,7 @@ export default function MatriculaPage() {
                               className="btn btn-danger btn-sm"
                               onClick={() => { setSelectedInscripcion(insc); setMotivo(''); setShowRetiroModal(true) }}
                             >
-                              🚪 Retirar
+                              Retirar
                             </button>
                           )}
                         </td>
@@ -275,14 +274,13 @@ export default function MatriculaPage() {
               <>
                 <button className="btn btn-secondary" onClick={() => setShowRetiroModal(false)}>Cancelar</button>
                 <button id="btn-confirm-retiro" className="btn btn-danger" onClick={handleRetiro} disabled={saving}>
-                  {saving ? 'Procesando...' : '🚪 Confirmar Retiro'}
+                  {saving ? 'Procesando...' : 'Confirmar Retiro'}
                 </button>
               </>
             }
           >
             <ErrorAlert message={error} onClose={() => setError('')} />
             <div className="alert alert-warning mb-4">
-              <span>⚠️</span>
               <span>Estás a punto de retirarte de esta sección. Verifica que estás dentro del período de retiro.</span>
             </div>
             <div className="form-group">

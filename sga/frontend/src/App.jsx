@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import PrivateRoute from './components/PrivateRoute'
+import Icon from './components/Icon'
 
 // Pages
 import LoginPage from './pages/LoginPage'
@@ -34,7 +35,7 @@ function NotFound() {
       alignItems: 'center', justifyContent: 'center', gap: 16,
       background: 'var(--bg-base)', color: 'var(--text-primary)',
     }}>
-      <div style={{ fontSize: '4rem' }}>🔍</div>
+      <Icon name="search" size={48} style={{ color: 'var(--ink-3)' }} />
       <h1 style={{ fontSize: '1.5rem', margin: 0 }}>Página no encontrada</h1>
       <p style={{ color: 'var(--text-muted)' }}>La ruta solicitada no existe en el sistema.</p>
       <a href="/login" className="btn btn-primary">Ir al inicio de sesión</a>
@@ -49,7 +50,7 @@ function Unauthorized() {
       alignItems: 'center', justifyContent: 'center', gap: 16,
       background: 'var(--bg-base)', color: 'var(--text-primary)',
     }}>
-      <div style={{ fontSize: '4rem' }}>🚫</div>
+      <Icon name="ban" size={48} style={{ color: 'var(--ink-3)' }} />
       <h1 style={{ fontSize: '1.5rem', margin: 0 }}>Sin autorización</h1>
       <p style={{ color: 'var(--text-muted)' }}>No tienes permisos para acceder a esta sección.</p>
       <a href="/login" className="btn btn-secondary">Volver al inicio</a>

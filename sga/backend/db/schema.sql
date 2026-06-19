@@ -103,6 +103,7 @@ CREATE TABLE intentos_login (
     id_tenant UUID REFERENCES tenants (id),
     intentos_fallidos INT NOT NULL DEFAULT 0,
     bloqueado_hasta TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
+import StatCard from '../../components/StatCard'
 import Badge from '../../components/Badge'
 import LoadingSpinner from '../../components/LoadingSpinner'
 import ErrorAlert from '../../components/ErrorAlert'
+import Icon from '../../components/Icon'
 import { historialService } from '../../services/historialService'
 import { useAuth } from '../../context/AuthContext'
 
@@ -25,7 +27,7 @@ export default function HistorialPage() {
     setDownloading(true)
     try {
       await historialService.descargarPDF(auth.id)
-    } catch (e) {
+    } catch {
       setError('Error al descargar el récord de notas')
     } finally {
       setDownloading(false)
@@ -35,116 +37,92 @@ export default function HistorialPage() {
   return (
     <Layout>
       <div className="page-container">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Historial Académico</h1>
-            <p className="page-subtitle">Registro de notas, promedios y condición académica</p>
+        <div className="page-head">
+          <div className="ph-l">
+            <h1 className="h1">Historial Académico</h1>
+            <p className="ph-sub">Registro de notas, promedios y condición académica</p>
           </div>
-          <button
-            id="btn-download-pdf"
-            className="btn btn-secondary"
-            onClick={handleDownloadPDF}
-            disabled={downloading || !historial}
-          >
-            {downloading ? '⏳ Descargando...' : '📄 Descargar Récord PDF'}
-          </button>
+          <div className="page-actions">
+            <button
+              id="btn-download-pdf"
+              className="btn btn-secondary"
+              onClick={handleDownloadPDF}
+              disabled={downloading || !historial}
+            >
+              {downloading ? 'Descargando…' : 'Descargar Récord PDF'}
+            </button>
+          </div>
         </div>
 
         <ErrorAlert message={error} onClose={() => setError('')} />
 
         {loading ? (
-          <LoadingSpinner text="Cargando historial académico..." />
+          <LoadingSpinner text="Cargando historial académico…" />
         ) : !historial ? (
-          <div className="card">
-            <div className="empty-state">
-              <span className="empty-state-icon">🎓</span>
-              <span className="empty-state-title">Sin historial académico</span>
-              <span className="empty-state-text">Aún no tienes períodos académicos completados</span>
+          <div className="card card-pad">
+            <div className="empty">
+              <div className="empty-ic"><Icon name="graduation-cap" size={32} style={{ color: 'var(--ink-4)' }} /></div>
+              <div className="empty-title">Sin historial académico</div>
+              <div className="empty-sub">Aún no tienes períodos académicos completados</div>
             </div>
           </div>
         ) : (
           <>
             {/* Resumen */}
             {historial.resumen && (
-              <div className="grid-3 mb-6">
-                <div className="stat-card">
-                  <div className="stat-card-icon indigo">📊</div>
-                  <div className="stat-card-info">
-                    <div className="stat-card-label">PPA Acumulado</div>
-                    <div className="stat-card-value">{historial.resumen.ppa ?? '—'}</div>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-card-icon green">✅</div>
-                  <div className="stat-card-info">
-                    <div className="stat-card-label">Créditos Aprobados</div>
-                    <div className="stat-card-value">{historial.resumen.creditos_aprobados ?? '—'}</div>
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-card-icon blue">📋</div>
-                  <div className="stat-card-info">
-                    <div className="stat-card-label">Condición Académica</div>
-                    <div className="stat-card-value" style={{ fontSize: '1rem' }}>
-                      {historial.resumen.condicion_academica
-                        ? <Badge value={historial.resumen.condicion_academica} />
-                        : 'Normal'}
-                    </div>
-                  </div>
-                </div>
+              <div className="stat-grid" style={{ marginBottom: 24 }}>
+                <StatCard icon={<Icon name="bar-chart" size={18} />} label="PPA Acumulado" value={historial.resumen.ppa ?? '—'} colorClass="indigo" />
+                <StatCard icon={<Icon name="check-circle" size={18} />} label="Créditos Aprobados" value={historial.resumen.creditos_aprobados ?? '—'} colorClass="green" />
+                <StatCard icon={<Icon name="clipboard" size={18} />} label="Condición Académica" value={historial.resumen.condicion_academica || 'Normal'} colorClass="blue" />
               </div>
             )}
 
             {/* Períodos */}
             {historial.periodos ? (
-              historial.periodos.map((periodo, pi) => (
-                <div key={pi} className="card mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3>{periodo.nombre_periodo}</h3>
-                    <div className="flex items-center gap-3">
-                      {periodo.pps !== undefined && (
-                        <span className="badge badge-indigo">PPS: {periodo.pps}</span>
+              historial.periodos.map((per, pi) => (
+                <div key={pi} className="card card-flush" style={{ marginBottom: 20 }}>
+                  <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <div className="h3">{per.nombre_periodo}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {per.pps !== undefined && (
+                        <span className="pill blue">PPS: {per.pps}</span>
                       )}
-                      <Badge value={periodo.estado} dot />
+                      <Badge value={per.estado} dot />
                     </div>
                   </div>
-
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Curso</th>
-                        <th>Créditos</th>
-                        <th>Nota Final</th>
-                        <th>Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(periodo.cursos || periodo.inscripciones || []).map((c, ci) => (
-                        <tr key={ci}>
-                          <td className="cell-primary">{c.nombre_curso || c.id_seccion || '—'}</td>
-                          <td>{c.creditos ?? '—'}</td>
-                          <td style={{ fontWeight: 700, color: c.nota_final >= 11 ? 'var(--success)' : 'var(--danger)' }}>
-                            {c.nota_final ?? '—'}
-                          </td>
-                          <td><Badge value={c.estado} dot /></td>
+                  <div className="tbl-wrap">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Curso</th>
+                          <th>Créditos</th>
+                          <th className="num">Nota Final</th>
+                          <th>Estado</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {(per.cursos || per.inscripciones || []).map((c, ci) => (
+                          <tr key={ci} className="zebra">
+                            <td className="cell-strong">{c.nombre_curso || c.id_seccion || '—'}</td>
+                            <td>{c.creditos ?? '—'}</td>
+                            <td className="num" style={{ fontWeight: 700, color: c.nota_final >= 11 ? 'var(--green)' : 'var(--red)' }}>
+                              {c.nota_final ?? '—'}
+                            </td>
+                            <td><Badge value={c.estado} dot /></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ))
             ) : (
-              /* Si el historial viene en formato diferente, mostramos los datos crudos de forma amigable */
-              <div className="card">
-                <h3 style={{ marginBottom: 16 }}>📋 Detalle del Historial</h3>
+              <div className="card card-pad">
+                <div className="h3" style={{ marginBottom: 14 }}>Detalle del Historial</div>
                 <pre style={{
-                  background: 'var(--bg-elevated)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '16px',
-                  fontSize: '0.82rem',
-                  color: 'var(--text-secondary)',
-                  overflow: 'auto',
-                  maxHeight: 400,
+                  background: 'var(--surface-3)', borderRadius: 'var(--r-sm)',
+                  padding: '14px', fontSize: '0.82rem', color: 'var(--ink-2)',
+                  overflow: 'auto', maxHeight: 400,
                 }}>
                   {JSON.stringify(historial, null, 2)}
                 </pre>

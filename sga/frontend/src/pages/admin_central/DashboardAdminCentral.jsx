@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import StatCard from '../../components/StatCard'
+import Badge from '../../components/Badge'
+import Icon from '../../components/Icon'
 import { tenantService } from '../../services/tenantService'
 
 export default function DashboardAdminCentral() {
+  const navigate = useNavigate()
   const [tenants, setTenants] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -20,68 +24,78 @@ export default function DashboardAdminCentral() {
   return (
     <Layout>
       <div className="page-container">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Panel de Control Central</h1>
-            <p className="page-subtitle">Administración global del sistema — ADMIN_CENTRAL</p>
+        <div className="page-head">
+          <div className="ph-l">
+            <h1 className="h1">Panel de Control Central</h1>
+            <p className="ph-sub">Administración global del sistema multi-institucional</p>
+          </div>
+          <div className="page-actions">
+            <button className="btn btn-primary" onClick={() => navigate('/admin-central/tenants')}>
+              + Nueva institución
+            </button>
           </div>
         </div>
 
-        <div className="grid-4 mb-6">
-          <StatCard icon="🏛️" label="Total Instituciones" value={loading ? '...' : tenants.length} colorClass="indigo" />
-          <StatCard icon="✅" label="Activas" value={loading ? '...' : activos} colorClass="green" />
-          <StatCard icon="⏸️" label="Inactivas" value={loading ? '...' : inactivos} colorClass="amber" />
-          <StatCard icon="🌐" label="Sistema" value="Online" colorClass="blue" />
+        <div className="stat-grid" style={{ marginBottom: 24 }}>
+          <StatCard icon={<Icon name="building" size={18} />} label="Total Instituciones" value={loading ? '…' : tenants.length} colorClass="indigo" />
+          <StatCard icon={<Icon name="check-circle" size={18} />} label="Activas" value={loading ? '…' : activos} colorClass="green" />
+          <StatCard icon={<Icon name="pause" size={18} />} label="Inactivas" value={loading ? '…' : inactivos} colorClass="amber" />
+          <StatCard icon={<Icon name="globe" size={18} />} label="Sistema" value="Online" colorClass="blue" />
         </div>
 
         <div className="grid-2">
-          <div className="card">
-            <h3 style={{ marginBottom: 12 }}>🏛️ Instituciones Recientes</h3>
+          <div className="card card-flush">
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="building" size={15} style={{ color: 'var(--ink-3)' }} />
+              <span className="h3">Instituciones</span>
+            </div>
             {loading ? (
-              <p className="text-muted text-sm">Cargando...</p>
+              <div style={{ padding: '40px 18px', textAlign: 'center', color: 'var(--ink-3)' }}>Cargando…</div>
             ) : tenants.length === 0 ? (
-              <p className="text-muted text-sm">No hay instituciones registradas aún.</p>
+              <div className="empty">
+                <div className="empty-ic"><Icon name="building" size={32} style={{ color: 'var(--ink-4)' }} /></div>
+                <div className="empty-title">Sin instituciones registradas</div>
+              </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {tenants.slice(0, 5).map(t => (
-                  <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ padding: '0 0 8px' }}>
+                {tenants.slice(0, 6).map(t => (
+                  <div
+                    key={t.id}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '12px 18px', borderBottom: '1px solid var(--line)',
+                    }}
+                  >
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{t.nombre}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.dominio}</div>
+                      <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--ink)' }}>{t.nombre}</div>
+                      <div className="caption">{t.dominio}</div>
                     </div>
-                    <span className={`badge ${t.estado === 'ACTIVO' ? 'badge-success' : 'badge-danger'}`}>
-                      {t.estado}
-                    </span>
+                    <Badge value={t.estado} dot />
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div className="card">
-            <h3 style={{ marginBottom: 12 }}>⚡ Accesos Rápidos</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="card card-pad">
+            <div className="h3" style={{ marginBottom: 14 }}>Accesos rápidos</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
-                { icon: '🏛️', label: 'Gestionar Instituciones', to: '/admin-central/tenants' },
-                { icon: '📚', label: 'Configurar Catálogos', to: '/admin-central/catalogos' },
+                { icon: 'building', label: 'Gestionar Instituciones', sub: 'Crear y administrar tenants', to: '/admin-central/tenants' },
+                { icon: 'library', label: 'Catálogos globales', sub: 'Escalas, componentes y condiciones', to: '/admin-central/catalogos' },
               ].map(item => (
-                <a
+                <button
                   key={item.to}
-                  href={item.to}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px', borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-elevated)', border: '1px solid var(--border)',
-                    color: 'var(--text-primary)', textDecoration: 'none',
-                    transition: 'all var(--transition)',
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-500)'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                  onClick={() => navigate(item.to)}
+                  className="quicklink"
                 >
-                  <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
-                  <span style={{ fontWeight: 500, fontSize: '0.9rem' }}>{item.label}</span>
-                  <span style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}>→</span>
-                </a>
+                  <Icon name={item.icon} size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>{item.label}</div>
+                    <div className="caption">{item.sub}</div>
+                  </div>
+                  <Icon name="chevron-right" size={14} style={{ color: 'var(--ink-4)' }} />
+                </button>
               ))}
             </div>
           </div>

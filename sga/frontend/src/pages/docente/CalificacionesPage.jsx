@@ -119,7 +119,7 @@ export default function CalificacionesPage() {
 
         {/* Filtros */}
         <div className="card mb-6">
-          <h3 style={{ marginBottom: 16 }}>📍 Seleccionar Sección y Componente</h3>
+          <h3 style={{ marginBottom: 16 }}>Seleccionar Sección y Componente</h3>
           <div className="grid-3">
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" htmlFor="sel-periodo-cal">Período</label>
@@ -147,7 +147,7 @@ export default function CalificacionesPage() {
         {/* Componentes de la sección */}
         {selectedSeccion && (
           <div className="card mb-6">
-            <h3 style={{ marginBottom: 16 }}>📋 Componentes de la Sección</h3>
+            <h3 style={{ marginBottom: 16 }}>Componentes de la Sección</h3>
             {componentes.length === 0 ? (
               <p className="text-muted text-sm">No hay componentes de evaluación configurados en esta sección.</p>
             ) : (
@@ -174,7 +174,7 @@ export default function CalificacionesPage() {
                               className="btn btn-primary btn-sm"
                               onClick={() => handlePublicar(comp.id)}
                             >
-                              📢 Publicar
+                              Publicar
                             </button>
                           )}
                           {comp.estado === 'CERRADO' && (
@@ -183,7 +183,7 @@ export default function CalificacionesPage() {
                               className="btn btn-secondary btn-sm"
                               onClick={() => { setSelectedCalif(comp.id); setShowCorrectModal(true) }}
                             >
-                              ✏️ Corrección
+                              Corrección
                             </button>
                           )}
                         </div>
@@ -200,12 +200,12 @@ export default function CalificacionesPage() {
         {selectedSeccion && selectedComponente && (
           <div className="card">
             <div className="flex items-center justify-between mb-4">
-              <h3>✏️ Registrar Calificaciones</h3>
+              <h3>Registrar Calificaciones</h3>
               {compObj && <Badge value={compObj.estado} dot />}
             </div>
 
             <div className="alert alert-info mb-4">
-              <span>ℹ️</span>
+              <span>Info:</span>
               <span>Ingresa el ID de inscripción y la nota del alumno. Las notas se guardan en estado <strong>BORRADOR</strong> hasta publicar el componente.</span>
             </div>
 
@@ -258,7 +258,7 @@ export default function CalificacionesPage() {
                 onClick={handleRegistrar}
                 disabled={saving || compObj?.estado === 'CERRADO'}
               >
-                {saving ? 'Registrando...' : '💾 Registrar Calificaciones'}
+                {saving ? 'Registrando...' : 'Registrar Calificaciones'}
               </button>
             </div>
           </div>
@@ -280,7 +280,6 @@ export default function CalificacionesPage() {
           >
             <ErrorAlert message={error} onClose={() => setError('')} />
             <div className="alert alert-warning">
-              <span>⚠️</span>
               <span>La corrección de calificaciones es un acto académico formal y queda registrado en auditoría.</span>
             </div>
             <div className="form-group">
