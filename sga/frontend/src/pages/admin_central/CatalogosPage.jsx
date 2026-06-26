@@ -23,7 +23,7 @@ export default function CatalogosPage() {
     tenantService.listar().then(list => {
       setTenants(list)
       if (list.length > 0) setSelectedTenant(list[0].id)
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   useEffect(() => {
@@ -104,16 +104,16 @@ export default function CatalogosPage() {
         <div className="grid-2">
           <div className="form-group">
             <label className="form-label" htmlFor="escala-min">Nota mínima</label>
-            <input id="escala-min" type="number" className="form-input" value={form.nota_minima || ''} onChange={e => setForm({ ...form, nota_minima: parseFloat(e.target.value) })} required />
+            <input id="escala-min" type="number" className="form-input" value={form.nota_minima ?? ''} onChange={e => setForm({ ...form, nota_minima: e.target.value === '' ? '' : parseFloat(e.target.value) })} required />
           </div>
           <div className="form-group">
             <label className="form-label" htmlFor="escala-max">Nota máxima</label>
-            <input id="escala-max" type="number" className="form-input" value={form.nota_maxima || ''} onChange={e => setForm({ ...form, nota_maxima: parseFloat(e.target.value) })} required />
+            <input id="escala-max" type="number" className="form-input" value={form.nota_maxima ?? ''} onChange={e => setForm({ ...form, nota_maxima: e.target.value === '' ? '' : parseFloat(e.target.value) })} required />
           </div>
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="escala-aprob">Nota aprobatoria</label>
-          <input id="escala-aprob" type="number" className="form-input" value={form.nota_aprobatoria || ''} onChange={e => setForm({ ...form, nota_aprobatoria: parseFloat(e.target.value) })} required />
+          <input id="escala-aprob" type="number" className="form-input" value={form.nota_aprobatoria ?? ''} onChange={e => setForm({ ...form, nota_aprobatoria: e.target.value === '' ? '' : parseFloat(e.target.value) })} required />
         </div>
       </>
     )
