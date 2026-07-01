@@ -93,6 +93,18 @@ async def listar_cursos_plan(
     return await _oferta_service().list_cursos_plan(tenant_id, plan_id)
 
 
+@router.delete("/planes-estudio/{plan_id}/cursos/{curso_id}", status_code=204)
+async def desasociar_curso_de_plan(
+    plan_id: UUID,
+    curso_id: UUID,
+    current_user: CurrentUser = Depends(require_roles("ADMIN")),
+) -> None:
+    tenant_id = resolve_tenant_id(current_user)
+    await _oferta_service().desasociar_curso_de_plan(
+        tenant_id, plan_id, curso_id, actor_id=current_user.id
+    )
+
+
 @router.post("/cursos/{curso_id}/prerrequisitos", response_model=PrerrequisitoResponse, status_code=201)
 async def configurar_prerrequisito(
     curso_id: UUID,

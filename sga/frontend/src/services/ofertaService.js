@@ -13,6 +13,7 @@ export const ofertaService = {
   // Cursos en un plan
   listarCursosPlan: (planId) => api.get(`/oferta/planes-estudio/${planId}/cursos`).then(r => r.data),
   asociarCursoAPlan: (planId, data) => api.post(`/oferta/planes-estudio/${planId}/cursos`, data).then(r => r.data),
+  desasociarCursoDePlan: (planId, cursoId) => api.delete(`/oferta/planes-estudio/${planId}/cursos/${cursoId}`).then(r => r.data),
 
   // Prerrequisitos
   configurarPrerequisito: (cursoId, data) => api.post(`/oferta/cursos/${cursoId}/prerrequisitos`, data).then(r => r.data),

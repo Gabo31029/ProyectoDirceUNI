@@ -280,6 +280,7 @@ class CursoCreate(BaseModel):
     creditos: int = Field(gt=0)
     tipo_curso: str = Field(pattern=r"^(OBLIGATORIO|ELECTIVO)$")
     ciclo_sugerido: int | None = None
+    prerrequisitos: list[UUID] = []
 
 
 class CursoResponse(BaseModel):
@@ -293,6 +294,8 @@ class CursoResponse(BaseModel):
     activo: bool
     created_at: datetime
     updated_at: datetime
+    prerrequisitos: list[UUID] = []
+
 
 
 class CursoAsociarPlan(BaseModel):

@@ -314,3 +314,18 @@ class OfertaRepository:
                 id_seccion,
             )
             return list(rows)
+
+    async def desasociar_curso_de_plan(
+        self,
+        *,
+        id_plan_estudios: UUID,
+        id_curso: UUID,
+    ) -> bool:
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                "DELETE FROM plan_estudios_curso WHERE id_plan_estudios = $1 AND id_curso = $2",
+                id_plan_estudios,
+                id_curso,
+            )
+            return result != "DELETE 0"
+

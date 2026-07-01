@@ -145,27 +145,55 @@ class OfertaService:
         if await self.repo.get_curso_by_codigo(payload.codigo_curso, tenant_id):
             raise ConflictError("Ya existe un curso con ese codigo en la institucion.")
 
-        row = await self.repo.create_curso(
-            id_tenant=tenant_id,
-            codigo_curso=payload.codigo_curso,
-            nombre_curso=payload.nombre_curso,
-            creditos=payload.creditos,
-            tipo_curso=payload.tipo_curso,
-            ciclo_sugerido=payload.ciclo_sugerido,
-        )
-
         async with self.pool.acquire() as conn:
-            await self.audit_repo.registrar(
-                conn,
-                id_tenant=tenant_id,
-                id_usuario=actor_id,
-                tipo_operacion="CURSO_CREADO",
-                entidad_afectada="curso",
-                id_entidad=row["id"],
-                valor_nuevo=dict(row),
-            )
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO curso (id_tenant, codigo_curso, nombre_curso, creditos, tipo_curso, ciclo_sugerido)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    RETURNING *
+                    """,
+                    tenant_id,
+                    payload.codigo_curso,
+                    payload.nombre_curso,
+                    payload.creditos,
+                    payload.tipo_curso,
+                    payload.ciclo_sugerido,
+                )
 
-        return _map_curso(row)
+                for prereq_id in payload.prerrequisitos:
+                    if prereq_id == row["id"]:
+                        raise ValidationError("Un curso no puede ser prerrequisito de si mismo.")
+                    prereq_exists = await conn.fetchval(
+                        "SELECT EXISTS(SELECT 1 FROM curso WHERE id = $1 AND id_tenant = $2)",
+                        prereq_id,
+                        tenant_id,
+                    )
+                    if not prereq_exists:
+                        raise NotFoundError(f"Curso prerrequisito con ID {prereq_id} no encontrado.")
+                    
+                    await conn.execute(
+                        """
+                        INSERT INTO prerrequisito (id_curso, id_curso_requerido, tipo_prereq)
+                        VALUES ($1, $2, 'APROBACION_CURSO')
+                        """,
+                        row["id"],
+                        prereq_id,
+                    )
+
+                await self.audit_repo.registrar(
+                    conn,
+                    id_tenant=tenant_id,
+                    id_usuario=actor_id,
+                    tipo_operacion="CURSO_CREADO",
+                    entidad_afectada="curso",
+                    id_entidad=row["id"],
+                    valor_nuevo=dict(row),
+                )
+
+        res = _map_curso(row)
+        res.prerrequisitos = payload.prerrequisitos
+        return res
 
     async def asociar_curso_a_plan(
         self, tenant_id: UUID, plan_id: UUID, payload: CursoAsociarPlan, *, actor_id: UUID
@@ -173,6 +201,9 @@ class OfertaService:
         plan = await self.repo.get_plan_estudios_by_id(plan_id, tenant_id)
         if plan is None:
             raise NotFoundError("Plan de estudios no encontrado.")
+        if plan["estado"] == PlanEstado.ACTIVO.value:
+            raise ValidationError("No se puede asociar cursos a un plan de estudios ACTIVO.")
+
         curso = await self.repo.get_curso_by_id(payload.id_curso, tenant_id)
         if curso is None:
             raise NotFoundError("Curso no encontrado.")
@@ -191,16 +222,114 @@ class OfertaService:
         )
         return dict(row)
 
+    async def desasociar_curso_de_plan(
+        self, tenant_id: UUID, plan_id: UUID, curso_id: UUID, *, actor_id: UUID
+    ) -> None:
+        plan = await self.repo.get_plan_estudios_by_id(plan_id, tenant_id)
+        if plan is None:
+            raise NotFoundError("Plan de estudios no encontrado.")
+        if plan["estado"] == PlanEstado.ACTIVO.value:
+            raise ValidationError("No se puede desasociar cursos de un plan de estudios ACTIVO.")
+
+        curso = await self.repo.get_curso_by_id(curso_id, tenant_id)
+        if curso is None:
+            raise NotFoundError("Curso no encontrado.")
+
+        # Verificar si está asociado
+        asociados = await self.repo.get_cursos_por_plan(plan_id)
+        asociado = False
+        for a in asociados:
+            if a["id"] == curso_id:
+                asociado = True
+                break
+        if not asociado:
+            raise NotFoundError("El curso no esta asociado a este plan de estudios.")
+
+        deleted = await self.repo.desasociar_curso_de_plan(
+            id_plan_estudios=plan_id,
+            id_curso=curso_id,
+        )
+        if not deleted:
+            raise ConflictError("No se pudo desasociar el curso del plan.")
+
+        async with self.pool.acquire() as conn:
+            await self.audit_repo.registrar(
+                conn,
+                id_tenant=tenant_id,
+                id_usuario=actor_id,
+                tipo_operacion="CURSO_DESASOCIADO_DE_PLAN",
+                entidad_afectada="plan_estudios_curso",
+                id_entidad=plan_id,
+                valor_anterior={"id_plan_estudios": str(plan_id), "id_curso": str(curso_id)},
+            )
+
     async def list_cursos(self, tenant_id: UUID) -> list[CursoResponse]:
         rows = await self.repo.list_cursos(tenant_id)
-        return [_map_curso(row) for row in rows]
+        
+        # Consultar masivamente los prerrequisitos para el tenant
+        async with self.pool.acquire() as conn:
+            prereqs = await conn.fetch(
+                """
+                SELECT p.id_curso, p.id_curso_requerido
+                FROM prerrequisito p
+                JOIN curso c ON p.id_curso = c.id
+                WHERE c.id_tenant = $1 AND c.activo = TRUE AND p.id_curso_requerido IS NOT NULL
+                """,
+                tenant_id,
+            )
+            
+        prereq_map = {}
+        for r in prereqs:
+            c_id = r["id_curso"]
+            req_id = r["id_curso_requerido"]
+            if c_id not in prereq_map:
+                prereq_map[c_id] = []
+            prereq_map[c_id].append(req_id)
+            
+        cursos_res = []
+        for row in rows:
+            curso_dto = _map_curso(row)
+            curso_dto.prerrequisitos = prereq_map.get(curso_dto.id, [])
+            cursos_res.append(curso_dto)
+            
+        return cursos_res
 
     async def list_cursos_plan(self, tenant_id: UUID, plan_id: UUID) -> list[dict]:
         plan = await self.repo.get_plan_estudios_by_id(plan_id, tenant_id)
         if plan is None:
             raise NotFoundError("Plan de estudios no encontrado.")
         rows = await self.repo.get_cursos_por_plan(plan_id)
-        return [dict(r) for r in rows]
+        
+        if not rows:
+            return []
+            
+        curso_ids = [r["id"] for r in rows]
+        
+        async with self.pool.acquire() as conn:
+            prereqs = await conn.fetch(
+                """
+                SELECT id_curso, id_curso_requerido
+                FROM prerrequisito
+                WHERE id_curso = ANY($1) AND id_curso_requerido IS NOT NULL
+                """,
+                curso_ids,
+            )
+            
+        prereq_map = {}
+        for r in prereqs:
+            c_id = r["id_curso"]
+            req_id = r["id_curso_requerido"]
+            if c_id not in prereq_map:
+                prereq_map[c_id] = []
+            prereq_map[c_id].append(req_id)
+            
+        res = []
+        for r in rows:
+            d = dict(r)
+            d["prerrequisitos"] = prereq_map.get(r["id"], [])
+            res.append(d)
+            
+        return res
 
     async def configurar_prerrequisitos(
         self, tenant_id: UUID, curso_id: UUID, payload: PrerrequisitoCreate, *, actor_id: UUID
