@@ -30,4 +30,9 @@ export const periodoService = {
   // Dispersión
   crearDispersion: (periodoId, data) => api.post(`/periodos/${periodoId}/politicas-dispersion`, data).then(r => r.data),
   obtenerDispersion: (periodoId) => api.get(`/periodos/${periodoId}/politicas-dispersion`).then(r => r.data),
+
+  // Turnos de Matrícula
+  crearPoliticaTurno: (periodoId, data) => api.post(`/periodos/${periodoId}/politicas-turno`, data).then(r => r.data),
+  listarPoliticasTurno: (periodoId) => api.get(`/periodos/${periodoId}/politicas-turno`).then(r => r.data),
+  limpiarPoliticasTurno: (periodoId) => api.delete(`/periodos/${periodoId}/politicas-turno`).then(r => r.data),
 }

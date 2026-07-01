@@ -159,7 +159,7 @@ export default function LoginPage() {
               <label className="label" htmlFor="dominio_tenant">
                 Dominio institucional{' '}
                 <span style={{ color: 'var(--ink-3)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
-                  (Docentes y Alumnos)
+                  (Solo si perteneces a una institución)
                 </span>
               </label>
               <input

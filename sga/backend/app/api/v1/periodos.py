@@ -13,6 +13,8 @@ from app.models.schemas import (
     PoliticaReservaCreate,
     FormulaPromedioCreate,
     PoliticaDispersionCreate,
+    PoliticaTurnoCreate,
+    PoliticaTurnoResponse,
 )
 from app.services.periodo_service import PeriodoService
 
@@ -199,3 +201,34 @@ async def obtener_politica_dispersion(
 ) -> dict | None:
     tenant_id = resolve_tenant_id(current_user)
     return await _periodo_service().get_politica_dispersion(tenant_id, periodo_id)
+
+
+# --- Politicas Turno Matricula ---
+@router.post("/{periodo_id}/politicas-turno", status_code=201)
+async def crear_politica_turno(
+    periodo_id: UUID,
+    payload: PoliticaTurnoCreate,
+    current_user: CurrentUser = Depends(require_roles("ADMIN")),
+) -> dict:
+    tenant_id = resolve_tenant_id(current_user)
+    return await _periodo_service().add_politica_turno(
+        tenant_id, periodo_id, payload.model_dump(), actor_id=current_user.id
+    )
+
+
+@router.get("/{periodo_id}/politicas-turno")
+async def listar_politicas_turno(
+    periodo_id: UUID,
+    current_user: CurrentUser = Depends(require_roles("ADMIN", "ALUMNO")),
+) -> list[dict]:
+    tenant_id = resolve_tenant_id(current_user)
+    return await _periodo_service().list_politicas_turno(tenant_id, periodo_id)
+
+
+@router.delete("/{periodo_id}/politicas-turno", status_code=204)
+async def limpiar_politicas_turno(
+    periodo_id: UUID,
+    current_user: CurrentUser = Depends(require_roles("ADMIN")),
+) -> None:
+    tenant_id = resolve_tenant_id(current_user)
+    await _periodo_service().clear_politicas_turno(tenant_id, periodo_id)

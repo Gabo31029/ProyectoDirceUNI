@@ -144,6 +144,7 @@ export default function MatriculaPage() {
               id="btn-inscribir-seccion"
               className="btn btn-primary"
               onClick={() => { setSelectedSeccion(''); setShowInscModal(true) }}
+              disabled={matriculaActiva.fecha_hora_turno && new Date() < new Date(matriculaActiva.fecha_hora_turno)}
             >
               + Inscribir Sección
             </button>
@@ -181,6 +182,16 @@ export default function MatriculaPage() {
           </div>
         ) : (
           <>
+            {/* Alerta de Turno de Matrícula */}
+            {matriculaActiva.fecha_hora_turno && new Date() < new Date(matriculaActiva.fecha_hora_turno) && (
+              <div className="banner banner-danger mb-6" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 18 }}>⚠️</span>
+                <span>
+                  <strong>Aún no es tu turno de matrícula.</strong> Tu ingreso asignado es el <strong>Turno {matriculaActiva.numero_turno}</strong>, programado para iniciar el <strong>{new Date(matriculaActiva.fecha_hora_turno).toLocaleString('es-PE')}</strong>.
+                </span>
+              </div>
+            )}
+
             {/* Info de matrícula */}
             <div className="card mb-6">
               <h3 style={{ marginBottom: 16 }}>Información de Matrícula</h3>
@@ -197,6 +208,15 @@ export default function MatriculaPage() {
                   <div className="info-label">Fecha de Matrícula</div>
                   <div className="info-value">{new Date(matriculaActiva.fecha_matricula).toLocaleDateString('es-PE')}</div>
                 </div>
+                {matriculaActiva.numero_turno && (
+                  <div className="info-item">
+                    <div className="info-label">Turno de Matrícula</div>
+                    <div className="info-value">
+                      Turno {matriculaActiva.numero_turno} 
+                      {matriculaActiva.fecha_hora_turno && ` (Inicia: ${new Date(matriculaActiva.fecha_hora_turno).toLocaleString('es-PE')})`}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

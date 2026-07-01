@@ -117,6 +117,14 @@ class PeriodoService:
         if estado_nuevo == PeriodoEstado.CERRADO:
             await self._ejecutar_cierre_academico(tenant_id, periodo_id)
 
+        # Transición a MATRICULA: Asignar/actualizar turnos de matrículas existentes
+        if estado_nuevo == PeriodoEstado.MATRICULA:
+            from app.repositories.matricula_repository import MatriculaRepository
+            async with self.pool.acquire() as conn:
+                await MatriculaRepository(self.pool).actualizar_turnos_matriculas_periodo(
+                    conn, tenant_id, periodo_id
+                )
+
         row = await self.repo.update_estado(
             periodo_id, tenant_id, estado_nuevo.value, actor_id
         )
@@ -225,6 +233,56 @@ class PeriodoService:
             raise NotFoundError("Periodo academico no encontrado.")
         rows = await self.repo.get_politicas_credito_by_periodo(periodo_id)
         return [dict(r) for r in rows]
+
+    # --- Politicas Turno Matricula ---
+    async def add_politica_turno(
+        self, tenant_id: UUID, periodo_id: UUID, payload: dict, *, actor_id: UUID
+    ) -> dict:
+        periodo = await self.repo.get_by_id(periodo_id, tenant_id)
+        if periodo is None:
+            raise NotFoundError("Periodo academico no encontrado.")
+        if periodo["estado"] != PeriodoEstado.CONFIGURACION.value:
+            raise ValidationError("Solo se pueden agregar políticas en estado CONFIGURACION.")
+
+        from datetime import datetime
+        dt_str = payload["fecha_hora_inicio"]
+        if isinstance(dt_str, str):
+            if dt_str.endswith("Z"):
+                dt_str = dt_str[:-1] + "+00:00"
+            fecha_hora_inicio = datetime.fromisoformat(dt_str)
+        else:
+            fecha_hora_inicio = dt_str
+
+        row = await self.repo.create_politica_turno(
+            id_periodo=periodo_id,
+            numero_turno=int(payload["numero_turno"]),
+            fecha_hora_inicio=fecha_hora_inicio,
+            creditos_maximos=int(payload["creditos_maximos"]),
+        )
+        
+        # Recalcular turnos si hubiera matrículas existentes
+        from app.repositories.matricula_repository import MatriculaRepository
+        async with self.pool.acquire() as conn:
+            await MatriculaRepository(self.pool).actualizar_turnos_matriculas_periodo(
+                conn, tenant_id, periodo_id
+            )
+
+        return dict(row)
+
+    async def list_politicas_turno(self, tenant_id: UUID, periodo_id: UUID) -> list[dict]:
+        periodo = await self.repo.get_by_id(periodo_id, tenant_id)
+        if periodo is None:
+            raise NotFoundError("Periodo academico no encontrado.")
+        rows = await self.repo.get_politicas_turno_by_periodo(periodo_id)
+        return [dict(r) for r in rows]
+
+    async def clear_politicas_turno(self, tenant_id: UUID, periodo_id: UUID) -> None:
+        periodo = await self.repo.get_by_id(periodo_id, tenant_id)
+        if periodo is None:
+            raise NotFoundError("Periodo academico no encontrado.")
+        if periodo["estado"] != PeriodoEstado.CONFIGURACION.value:
+            raise ValidationError("Solo se pueden modificar políticas en estado CONFIGURACION.")
+        await self.repo.delete_politicas_turno_by_periodo(periodo_id)
 
     async def add_politica_condicion(
         self, tenant_id: UUID, periodo_id: UUID, payload: dict, *, actor_id: UUID

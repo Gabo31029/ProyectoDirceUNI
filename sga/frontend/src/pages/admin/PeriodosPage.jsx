@@ -7,7 +7,7 @@ import ErrorAlert, { SuccessAlert } from '../../components/ErrorAlert'
 import { periodoService } from '../../services/periodoService'
 
 const ESTADOS = ['CONFIGURACION', 'MATRICULA', 'REGISTRO_NOTAS', 'CERRADO']
-const TABS_POLITICAS = ['Crédito', 'Condición', 'Retiro', 'Reserva', 'Fórmula', 'Dispersión']
+const TABS_POLITICAS = ['Turnos de Matrícula', 'Condición', 'Retiro', 'Reserva', 'Fórmula', 'Dispersión']
 
 export default function PeriodosPage() {
   const [periodos, setPeriodos] = useState([])
@@ -41,7 +41,7 @@ export default function PeriodosPage() {
   const loadPoliticas = async (periodoId, tab) => {
     try {
       let result = []
-      if (tab === 0) result = await periodoService.listarPoliticasCredito(periodoId)
+      if (tab === 0) result = await periodoService.listarPoliticasTurno(periodoId)
       else if (tab === 1) result = await periodoService.listarPoliticasCondicion(periodoId)
       else if (tab === 2) result = await periodoService.listarPoliticasRetiro(periodoId)
       else if (tab === 3) {
@@ -109,7 +109,7 @@ export default function PeriodosPage() {
     setError('')
     try {
       const id = selectedPeriodo.id
-      if (politicasTab === 0) await periodoService.crearPoliticaCredito(id, polForm)
+      if (politicasTab === 0) await periodoService.crearPoliticaTurno(id, polForm)
       else if (politicasTab === 1) await periodoService.crearPoliticaCondicion(id, polForm)
       else if (politicasTab === 2) await periodoService.crearPoliticaRetiro(id, polForm)
       else if (politicasTab === 3) await periodoService.crearPoliticaReserva(id, polForm)
@@ -144,16 +144,16 @@ export default function PeriodosPage() {
     if (politicasTab === 0) return (
       <div className="grid-2">
         <div className="form-group">
-          <label className="form-label" htmlFor="pol-ppa-min">PPA Mínimo</label>
-          <input id="pol-ppa-min" type="number" step="0.01" className="form-input" value={f.ppa_minimo || ''} onChange={e => set('ppa_minimo', e.target.value)} />
+          <label className="form-label" htmlFor="pol-num-turno">Número de Turno</label>
+          <input id="pol-num-turno" type="number" className="form-input" value={f.numero_turno || ''} onChange={e => set('numero_turno', parseInt(e.target.value))} placeholder="ej: 1" required />
         </div>
         <div className="form-group">
-          <label className="form-label" htmlFor="pol-ppa-max">PPA Máximo</label>
-          <input id="pol-ppa-max" type="number" step="0.01" className="form-input" value={f.ppa_maximo || ''} onChange={e => set('ppa_maximo', e.target.value)} />
+          <label className="form-label" htmlFor="pol-fecha-inicio-turno">Fecha y Hora de Inicio</label>
+          <input id="pol-fecha-inicio-turno" type="datetime-local" className="form-input" value={f.fecha_hora_inicio || ''} onChange={e => set('fecha_hora_inicio', e.target.value)} required />
         </div>
         <div className="form-group">
-          <label className="form-label" htmlFor="pol-cred-max">Créditos Máximos</label>
-          <input id="pol-cred-max" type="number" className="form-input" value={f.creditos_maximos || ''} onChange={e => set('creditos_maximos', parseInt(e.target.value))} />
+          <label className="form-label" htmlFor="pol-cred-max">Créditos Máximos del Turno</label>
+          <input id="pol-cred-max" type="number" className="form-input" value={f.creditos_maximos || ''} onChange={e => set('creditos_maximos', parseInt(e.target.value))} placeholder="ej: 22" required />
         </div>
       </div>
     )
@@ -171,7 +171,7 @@ export default function PeriodosPage() {
           <label className="form-label" htmlFor="pol-operador">Operador</label>
           <select id="pol-operador" className="form-select" value={f.operador || ''} onChange={e => set('operador', e.target.value)}>
             <option value="">Selecciona...</option>
-            {['MAYOR_QUE','MAYOR_IGUAL','IGUAL','MENOR_IGUAL','MENOR_QUE'].map(o => <option key={o} value={o}>{o.replace('_',' ')}</option>)}
+            {['MAYOR_QUE', 'MAYOR_IGUAL', 'IGUAL', 'MENOR_IGUAL', 'MENOR_QUE'].map(o => <option key={o} value={o}>{o.replace('_', ' ')}</option>)}
           </select>
         </div>
         <div className="form-group">
@@ -389,9 +389,10 @@ export default function PeriodosPage() {
                     padding: '12px 16px', marginBottom: 8, fontSize: '0.825rem',
                     border: '1px solid var(--border)'
                   }}>
-                    {Object.entries(p).filter(([k]) => !['id','id_periodo','id_tenant','id_tipo_condicion','created_at'].includes(k)).map(([k, v]) => (
+                    {Object.entries(p).filter(([k]) => !['id', 'id_periodo', 'id_tenant', 'id_tipo_condicion', 'created_at'].includes(k)).map(([k, v]) => (
                       <span key={k} style={{ marginRight: 16, color: 'var(--text-secondary)' }}>
-                        <strong style={{ color: 'var(--text-primary)' }}>{k}:</strong> {String(v)}
+                        <strong style={{ color: 'var(--text-primary)' }}>{k === 'fecha_hora_inicio' ? 'fecha_inicio' : k}:</strong>{' '}
+                        {k === 'fecha_hora_inicio' ? new Date(v).toLocaleString('es-PE') : String(v)}
                       </span>
                     ))}
                   </div>

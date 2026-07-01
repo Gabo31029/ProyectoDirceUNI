@@ -1,5 +1,5 @@
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 import asyncpg
 
@@ -109,6 +109,45 @@ class PeriodoRepository:
                 id_periodo,
             )
             return list(rows)
+
+    # --- Politicas Turno Matricula ---
+    async def create_politica_turno(
+        self,
+        *,
+        id_periodo: UUID,
+        numero_turno: int,
+        fecha_hora_inicio: datetime,
+        creditos_maximos: int,
+    ) -> asyncpg.Record:
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow(
+                """
+                INSERT INTO politica_turno_matricula (id_periodo, numero_turno, fecha_hora_inicio, creditos_maximos)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (id_periodo, numero_turno) DO UPDATE
+                SET fecha_hora_inicio = EXCLUDED.fecha_hora_inicio, creditos_maximos = EXCLUDED.creditos_maximos
+                RETURNING *
+                """,
+                id_periodo,
+                numero_turno,
+                fecha_hora_inicio,
+                creditos_maximos,
+            )
+
+    async def get_politicas_turno_by_periodo(self, id_periodo: UUID) -> list[asyncpg.Record]:
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT * FROM politica_turno_matricula WHERE id_periodo = $1 ORDER BY numero_turno",
+                id_periodo,
+            )
+            return list(rows)
+
+    async def delete_politicas_turno_by_periodo(self, id_periodo: UUID) -> None:
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM politica_turno_matricula WHERE id_periodo = $1",
+                id_periodo,
+            )
 
     # --- Politicas Condicion Academica ---
     async def create_politica_condicion(

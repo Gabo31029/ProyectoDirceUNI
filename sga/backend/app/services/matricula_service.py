@@ -32,6 +32,8 @@ def _map_matricula(row: asyncpg.Record) -> MatriculaResponse:
         estado=row["estado"],
         creditos_matriculados=row["creditos_matriculados"],
         fecha_matricula=row["fecha_matricula"],
+        numero_turno=row.get("numero_turno"),
+        fecha_hora_turno=row.get("fecha_hora_turno"),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -109,6 +111,11 @@ class MatriculaService:
         if existente and existente["estado"] == "ACTIVA":
             raise ConflictError("El alumno ya tiene una matricula activa para este periodo.")
 
+        # Calcular el turno de matrícula para el estudiante
+        numero_turno, fecha_hora_turno = await self.repo.calcular_turno_para_alumno(
+            tenant_id, payload.id_periodo, alumno_id
+        )
+
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 row = await self.repo.create_matricula(
@@ -116,6 +123,8 @@ class MatriculaService:
                     tenant_id=tenant_id,
                     alumno_id=alumno_id,
                     periodo_id=payload.id_periodo,
+                    numero_turno=numero_turno,
+                    fecha_hora_turno=fecha_hora_turno,
                 )
                 await self.repo.upsert_cuenta_seguimiento_creditos(
                     conn,
@@ -133,6 +142,7 @@ class MatriculaService:
                     valor_nuevo={
                         "id_alumno": str(alumno_id),
                         "id_periodo": str(payload.id_periodo),
+                        "numero_turno": numero_turno,
                     },
                 )
 
@@ -194,6 +204,12 @@ class MatriculaService:
         except ValueError as exc:
             raise ConflictError(str(exc)) from exc
 
+        # Validar si es el turno del alumno
+        from datetime import datetime, timezone
+        if matricula.get("fecha_hora_turno") and datetime.now(timezone.utc) < matricula["fecha_hora_turno"]:
+            from_local = matricula["fecha_hora_turno"]
+            raise ConflictError(f"Aún no es su turno de matrícula. Su turno inicia el {from_local.strftime('%d/%m/%Y %H:%M:%S')}")
+
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 seccion = await self.repo.get_seccion_for_update(
@@ -238,10 +254,17 @@ class MatriculaService:
                 except ValueError as exc:
                     raise ValidationError(str(exc)) from exc
 
-                max_creditos = await self.repo.get_max_creditos_periodo(matricula["id_periodo"])
+                max_creditos = None
+                if matricula.get("numero_turno"):
+                    max_creditos = await self.repo.get_max_creditos_turno(
+                        matricula["id_periodo"], matricula["numero_turno"]
+                    )
+                if max_creditos is None:
+                    max_creditos = await self.repo.get_max_creditos_periodo(matricula["id_periodo"])
+
                 if max_creditos is None:
                     raise ValidationError(
-                        "No existe politica de creditos configurada para el periodo."
+                        "No existe política de créditos o turnos configurada para el periodo."
                     )
 
                 try:

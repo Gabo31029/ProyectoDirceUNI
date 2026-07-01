@@ -167,6 +167,23 @@ class PeriodoAcademico(Base):
         CheckConstraint("fecha_inicio < fecha_fin", name="chk_periodo_fechas"),
     )
 
+class PoliticaTurnoMatricula(Base):
+    __tablename__ = "politica_turno_matricula"
+    
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id_periodo = Column(String(36), ForeignKey("periodo_academico.id_periodo", ondelete="CASCADE"), nullable=False)
+    numero_turno = Column(Integer, nullable=False)
+    fecha_hora_inicio = Column(DateTime(timezone=True), nullable=False)
+    creditos_maximos = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    
+    periodo = relationship("PeriodoAcademico", backref="politicas_turno")
+    
+    __table_args__ = (
+        UniqueConstraint("id_periodo", "numero_turno", name="uq_politica_turno_periodo"),
+        CheckConstraint("creditos_maximos > 0", name="chk_politica_turno_creditos"),
+    )
+
 class Curso(Base):
     __tablename__ = "curso"
     
@@ -238,6 +255,8 @@ class Matricula(Base):
     fecha_registro = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     estado = Column(String(15), nullable=False, default="ACTIVA")  # ACTIVA, RESERVADA, ANULADA
     numero_constancia = Column(String(50), nullable=True)
+    numero_turno = Column(Integer, nullable=True, default=1)
+    fecha_hora_turno = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     

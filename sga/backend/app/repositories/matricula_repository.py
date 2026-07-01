@@ -1,4 +1,5 @@
 from uuid import UUID
+from datetime import datetime
 
 import asyncpg
 
@@ -67,6 +68,115 @@ class MatriculaRepository:
         )
         return list(rows)
 
+    async def get_max_creditos_turno(self, periodo_id: UUID, numero_turno: int) -> int | None:
+        return await self.pool.fetchval(
+            """
+            SELECT creditos_maximos FROM politica_turno_matricula 
+            WHERE id_periodo = $1 AND numero_turno = $2
+            """,
+            periodo_id,
+            numero_turno,
+        )
+
+    async def calcular_turno_para_alumno(self, tenant_id: UUID, id_periodo: UUID, alumno_id: UUID) -> tuple[int, datetime | None]:
+        # 1. Obtener políticas de turnos
+        turn_policies = await self.pool.fetch(
+            """
+            SELECT numero_turno, fecha_hora_inicio
+            FROM politica_turno_matricula
+            WHERE id_periodo = $1
+            ORDER BY numero_turno ASC
+            """,
+            id_periodo,
+        )
+        if not turn_policies:
+            return 1, None # Turno 1 por defecto, sin restricciones de horario
+            
+        # 2. Obtener alumnos activos ordenados por PPA desc
+        students = await self.pool.fetch(
+            """
+            SELECT pa.id_usuario, 
+                   COALESCE((SELECT ppa FROM snapshot_promedio WHERE id_perfil_alumno = pa.id_perfil_alumno ORDER BY created_at DESC LIMIT 1), 14.00) as ppa
+            FROM perfil_alumno pa
+            JOIN usuarios u ON u.id = pa.id_usuario
+            WHERE u.id_tenant = $1 AND u.activo = TRUE
+            ORDER BY ppa DESC, pa.codigo_alumno ASC
+            """,
+            tenant_id,
+        )
+        
+        # 3. Buscar el índice del alumno
+        idx = -1
+        for i, s in enumerate(students):
+            if s["id_usuario"] == alumno_id:
+                idx = i
+                break
+                
+        if idx == -1:
+            return 1, turn_policies[0]["fecha_hora_inicio"]
+            
+        # 4. Calcular el turno correspondiente
+        import math
+        N = len(turn_policies)
+        total_students = len(students)
+        students_per_turn = math.ceil(total_students / N)
+        if students_per_turn <= 0:
+            students_per_turn = 1
+            
+        turn_index = min(idx // students_per_turn, N - 1)
+        policy = turn_policies[turn_index]
+        return policy["numero_turno"], policy["fecha_hora_inicio"]
+
+    async def actualizar_turnos_matriculas_periodo(self, conn: asyncpg.Connection, tenant_id: UUID, periodo_id: UUID) -> None:
+        turn_policies = await conn.fetch(
+            """
+            SELECT numero_turno, fecha_hora_inicio
+            FROM politica_turno_matricula
+            WHERE id_periodo = $1
+            ORDER BY numero_turno ASC
+            """,
+            periodo_id,
+        )
+        if not turn_policies:
+            return
+            
+        students = await conn.fetch(
+            """
+            SELECT pa.id_usuario, 
+                   COALESCE((SELECT ppa FROM snapshot_promedio WHERE id_perfil_alumno = pa.id_perfil_alumno ORDER BY created_at DESC LIMIT 1), 14.00) as ppa
+            FROM perfil_alumno pa
+            JOIN usuarios u ON u.id = pa.id_usuario
+            WHERE u.id_tenant = $1 AND u.activo = TRUE
+            ORDER BY ppa DESC, pa.codigo_alumno ASC
+            """,
+            tenant_id,
+        )
+        
+        import math
+        N = len(turn_policies)
+        total_students = len(students)
+        if total_students == 0 or N == 0:
+            return
+        students_per_turn = math.ceil(total_students / N)
+        if students_per_turn <= 0:
+            students_per_turn = 1
+            
+        for idx, s in enumerate(students):
+            turn_index = min(idx // students_per_turn, N - 1)
+            policy = turn_policies[turn_index]
+            await conn.execute(
+                """
+                UPDATE matricula
+                SET numero_turno = $1, fecha_hora_turno = $2
+                WHERE id_alumno = $3 AND id_periodo = $4 AND id_tenant = $5
+                """,
+                policy["numero_turno"],
+                policy["fecha_hora_inicio"],
+                s["id_usuario"],
+                periodo_id,
+                tenant_id,
+            )
+
     async def create_matricula(
         self,
         conn: asyncpg.Connection,
@@ -74,17 +184,21 @@ class MatriculaRepository:
         tenant_id: UUID,
         alumno_id: UUID,
         periodo_id: UUID,
+        numero_turno: int = 1,
+        fecha_hora_turno: datetime | None = None,
     ) -> asyncpg.Record:
         """Crea la cabecera de la matrícula en la BD dentro de la transacción actual."""
         return await conn.fetchrow(
             """
-            INSERT INTO matricula (id_tenant, id_alumno, id_periodo)
-            VALUES ($1, $2, $3)
+            INSERT INTO matricula (id_tenant, id_alumno, id_periodo, numero_turno, fecha_hora_turno)
+            VALUES ($1, $2, $3, $4, $5)
             RETURNING *
             """,
             tenant_id,
             alumno_id,
             periodo_id,
+            numero_turno,
+            fecha_hora_turno,
         )
 
     async def update_creditos_matricula(

@@ -154,6 +154,21 @@ class PoliticaCreditoResponse(BaseModel):
     created_at: datetime
 
 
+class PoliticaTurnoCreate(BaseModel):
+    numero_turno: int = Field(gt=0)
+    fecha_hora_inicio: datetime
+    creditos_maximos: int = Field(gt=0)
+
+
+class PoliticaTurnoResponse(BaseModel):
+    id: UUID
+    id_periodo: UUID
+    numero_turno: int
+    fecha_hora_inicio: datetime
+    creditos_maximos: int
+    created_at: datetime
+
+
 class PoliticaCondicionCreate(BaseModel):
     id_tipo_condicion: UUID
     cuenta_evaluada: str
@@ -396,6 +411,8 @@ class MatriculaResponse(BaseModel):
     estado: MatriculaEstado
     creditos_matriculados: int
     fecha_matricula: datetime
+    numero_turno: int | None = None
+    fecha_hora_turno: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
