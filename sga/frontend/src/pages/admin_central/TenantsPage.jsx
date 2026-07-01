@@ -5,6 +5,7 @@ import Modal from '../../components/Modal'
 import ErrorAlert, { SuccessAlert } from '../../components/ErrorAlert'
 import Badge from '../../components/Badge'
 import { tenantService } from '../../services/tenantService'
+import { userService } from '../../services/userService'
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState([])
@@ -15,6 +16,12 @@ export default function TenantsPage() {
   const [editTenant, setEditTenant] = useState(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ nombre: '', dominio: '', zona_horaria: 'America/Lima' })
+
+  // Initial Administrator account states
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminNombre, setAdminNombre] = useState('')
+  const [adminApellido, setAdminApellido] = useState('')
 
   const fetchTenants = async () => {
     try {
@@ -32,12 +39,20 @@ export default function TenantsPage() {
   const openCreate = () => {
     setEditTenant(null)
     setForm({ nombre: '', dominio: '', zona_horaria: 'America/Lima' })
+    setAdminEmail('')
+    setAdminPassword('')
+    setAdminNombre('')
+    setAdminApellido('')
     setShowModal(true)
   }
 
   const openEdit = (t) => {
     setEditTenant(t)
     setForm({ nombre: t.nombre, dominio: t.dominio, zona_horaria: t.zona_horaria })
+    setAdminEmail('')
+    setAdminPassword('')
+    setAdminNombre('')
+    setAdminApellido('')
     setShowModal(true)
   }
 
@@ -45,13 +60,54 @@ export default function TenantsPage() {
     e.preventDefault()
     setSaving(true)
     setError('')
+
+    const trimmedNombre = form.nombre.trim()
+    const trimmedDominio = form.dominio ? form.dominio.trim().toLowerCase() : ''
+    const trimmedAdminEmail = adminEmail.trim()
+    const trimmedAdminPassword = adminPassword.trim()
+    const trimmedAdminNombre = adminNombre.trim()
+    const trimmedAdminApellido = adminApellido.trim()
+
     try {
       if (editTenant) {
-        await tenantService.actualizar(editTenant.id, { nombre: form.nombre, zona_horaria: form.zona_horaria })
+        await tenantService.actualizar(editTenant.id, { nombre: trimmedNombre, zona_horaria: form.zona_horaria })
         setSuccess('Institución actualizada correctamente')
       } else {
-        await tenantService.crear(form)
-        setSuccess('Institución creada correctamente')
+        // Validation for admin details
+        if (!trimmedAdminEmail || !trimmedAdminPassword || !trimmedAdminNombre || !trimmedAdminApellido || !trimmedNombre || !trimmedDominio) {
+          setError('Todos los campos son obligatorios.')
+          setSaving(false)
+          return
+        }
+        if (trimmedAdminPassword.length < 8) {
+          setError('La contraseña del administrador debe tener al menos 8 caracteres.')
+          setSaving(false)
+          return
+        }
+
+        // 1. Create the tenant
+        const newTenant = await tenantService.crear({
+          nombre: trimmedNombre,
+          dominio: trimmedDominio,
+          zona_horaria: form.zona_horaria
+        })
+
+        // 2. Create the tenant's admin user
+        try {
+          await userService.crear({
+            email: trimmedAdminEmail,
+            password: trimmedAdminPassword,
+            nombre: trimmedAdminNombre,
+            apellido: trimmedAdminApellido,
+            rol: 'ADMIN'
+          }, newTenant.id)
+          setSuccess('Institución y administrador creados correctamente')
+        } catch (userErr) {
+          setError(`Institución creada, pero falló la creación del administrador: ${userErr.response?.data?.detail || userErr.message}`)
+          setSaving(false)
+          fetchTenants()
+          return
+        }
       }
       setShowModal(false)
       fetchTenants()
@@ -142,6 +198,7 @@ export default function TenantsPage() {
                 onChange={e => setForm({ ...form, nombre: e.target.value })}
                 placeholder="Universidad Nacional de..."
                 required
+                autoComplete="off"
               />
             </div>
             {!editTenant && (
@@ -172,6 +229,64 @@ export default function TenantsPage() {
                 <option value="America/Buenos_Aires">America/Buenos_Aires</option>
               </select>
             </div>
+
+            {!editTenant && (
+              <>
+                <h4 style={{ marginTop: 24, marginBottom: 12, borderTop: '1px solid var(--border-color)', paddingTop: 16 }}>
+                  Cuenta del Administrador de la Institución
+                </h4>
+                <div className="grid-2" style={{ gap: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" htmlFor="admin-nombre">Nombre</label>
+                    <input
+                      id="admin-nombre"
+                      className="form-input"
+                      value={adminNombre}
+                      onChange={e => setAdminNombre(e.target.value)}
+                      placeholder="Nombre del admin"
+                      required
+                    />
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label" htmlFor="admin-apellido">Apellido</label>
+                    <input
+                      id="admin-apellido"
+                      className="form-input"
+                      value={adminApellido}
+                      onChange={e => setAdminApellido(e.target.value)}
+                      placeholder="Apellido del admin"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="form-group" style={{ marginTop: 12 }}>
+                  <label className="form-label" htmlFor="admin-email">Correo Electrónico</label>
+                  <input
+                    id="admin-email"
+                    type="email"
+                    className="form-input"
+                    value={adminEmail}
+                    onChange={e => setAdminEmail(e.target.value)}
+                    placeholder="admin@institucion.edu.pe"
+                    required
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="admin-password">Contraseña (mín. 8 caracteres)</label>
+                  <input
+                    id="admin-password"
+                    type="password"
+                    className="form-input"
+                    value={adminPassword}
+                    onChange={e => setAdminPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    autoComplete="new-password"
+                  />
+                </div>
+              </>
+            )}
           </Modal>
         )}
       </div>

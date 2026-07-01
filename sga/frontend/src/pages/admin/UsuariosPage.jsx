@@ -47,14 +47,38 @@ export default function UsuariosPage() {
     e.preventDefault()
     setSaving(true)
     setError('')
+
+    const trimmedNombre = form.nombre.trim()
+    const trimmedApellido = form.apellido.trim()
+    const trimmedEmail = form.email.trim()
+    const trimmedPassword = form.password.trim()
+    const trimmedRol = form.rol
+
     try {
       if (editUser) {
-        const payload = { nombre: form.nombre, apellido: form.apellido }
-        if (form.password) payload.password = form.password
+        const payload = { nombre: trimmedNombre, apellido: trimmedApellido }
+        if (form.password) payload.password = trimmedPassword
         await userService.actualizar(editUser.id, payload)
         setSuccess('Usuario actualizado')
       } else {
-        await userService.crear(form)
+        // Validation for new user details
+        if (!trimmedNombre || !trimmedApellido || !trimmedEmail || !trimmedPassword) {
+          setError('Todos los campos son obligatorios.')
+          setSaving(false)
+          return
+        }
+        if (trimmedPassword.length < 8) {
+          setError('La contraseña debe tener al menos 8 caracteres.')
+          setSaving(false)
+          return
+        }
+        await userService.crear({
+          nombre: trimmedNombre,
+          apellido: trimmedApellido,
+          email: trimmedEmail,
+          password: trimmedPassword,
+          rol: trimmedRol
+        })
         setSuccess('Usuario creado correctamente')
       }
       setShowModal(false)
@@ -81,11 +105,13 @@ export default function UsuariosPage() {
     { key: 'nombre', header: 'Nombre completo', primary: true, render: r => `${r.nombre} ${r.apellido}` },
     { accessor: 'email', header: 'Correo' },
     { key: 'rol', header: 'Rol', render: r => <Badge value={r.rol} /> },
-    { key: 'activo', header: 'Estado', render: r => (
-      <span className={`badge ${r.activo ? 'badge-success' : 'badge-danger'}`}>
-        {r.activo ? '● Activo' : '● Inactivo'}
-      </span>
-    )},
+    {
+      key: 'activo', header: 'Estado', render: r => (
+        <span className={`badge ${r.activo ? 'badge-success' : 'badge-danger'}`}>
+          {r.activo ? '● Activo' : '● Inactivo'}
+        </span>
+      )
+    },
   ]
 
   return (
@@ -158,7 +184,7 @@ export default function UsuariosPage() {
               <>
                 <div className="form-group">
                   <label className="form-label" htmlFor="user-email">Correo electrónico</label>
-                  <input id="user-email" type="email" className="form-input" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+                  <input id="user-email" type="email" className="form-input" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="usuario@institucion.edu.pe" required autoComplete="off" />
                 </div>
                 <div className="form-group">
                   <label className="form-label" htmlFor="user-rol">Rol</label>
@@ -172,7 +198,7 @@ export default function UsuariosPage() {
               <label className="form-label" htmlFor="user-password">
                 {editUser ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña'}
               </label>
-              <input id="user-password" type="password" className="form-input" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Mínimo 8 caracteres" required={!editUser} />
+              <input id="user-password" type="password" className="form-input" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Mínimo 8 caracteres" required={!editUser} autoComplete="new-password" />
             </div>
           </Modal>
         )}
