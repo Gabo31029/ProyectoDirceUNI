@@ -52,24 +52,79 @@ class UserService:
         if await self.repo.email_exists_in_tenant(tenant_id, str(payload.email)):
             raise ConflictError("Ya existe un usuario con ese correo en el tenant.")
 
-        row = await self.repo.create(
-            tenant_id=tenant_id,
-            email=str(payload.email),
-            password_hash=hash_password(payload.password),
-            nombre=payload.nombre,
-            apellido=payload.apellido,
-            rol=payload.rol.value,
-        )
         async with self.pool.acquire() as conn:
-            await self.audit_repo.registrar(
-                conn,
-                id_tenant=tenant_id,
-                id_usuario=actor_id,
-                tipo_operacion="USUARIO_CREADO",
-                entidad_afectada="usuarios",
-                id_entidad=row["id"],
-                valor_nuevo={"email": payload.email, "rol": payload.rol.value},
-            )
+            async with conn.transaction():
+                # 1. Si es ALUMNO, validar datos de perfil primero
+                if payload.rol == RolUsuario.ALUMNO:
+                    if not payload.id_plan_estudios or not payload.codigo_alumno or not payload.periodo_ingreso:
+                        raise ValidationError("Los campos codigo_alumno, id_plan_estudios y periodo_ingreso son obligatorios para alumnos.")
+
+                    plan_row = await conn.fetchrow(
+                        "SELECT id_plan_estudios, carrera FROM plan_estudios WHERE id = $1 AND id_tenant = $2",
+                        payload.id_plan_estudios,
+                        tenant_id,
+                    )
+                    if not plan_row:
+                        raise ValidationError("El plan de estudios especificado no existe o no pertenece a este tenant.")
+
+                    carrera = plan_row["carrera"]
+                    id_plan_estudios_legacy = plan_row["id_plan_estudios"]
+
+                    codigo_exists = await conn.fetchval(
+                        "SELECT 1 FROM perfil_alumno WHERE codigo_alumno = $1",
+                        payload.codigo_alumno,
+                    )
+                    if codigo_exists:
+                        raise ConflictError(f"Ya existe un alumno registrado con el código '{payload.codigo_alumno}'.")
+
+                # 2. Crear el usuario
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO usuarios (
+                        id_tenant, email, password_hash, nombre, apellido, rol, activo
+                    ) VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+                    RETURNING *
+                    """,
+                    tenant_id,
+                    str(payload.email),
+                    hash_password(payload.password),
+                    payload.nombre,
+                    payload.apellido,
+                    payload.rol.value,
+                )
+
+                # 3. Si es ALUMNO, crear su perfil
+                if payload.rol == RolUsuario.ALUMNO:
+                    await conn.execute(
+                        """
+                        INSERT INTO perfil_alumno (
+                            id_perfil_alumno,
+                            id_usuario,
+                            id_plan_estudios,
+                            codigo_alumno,
+                            carrera,
+                            ciclo_actual,
+                            periodo_ingreso
+                        ) VALUES (gen_random_uuid(), $1, $2, $3, $4, 1, $5)
+                        """,
+                        row["id"],
+                        id_plan_estudios_legacy,
+                        payload.codigo_alumno,
+                        carrera,
+                        payload.periodo_ingreso,
+                    )
+
+                # 4. Registrar auditoría
+                await self.audit_repo.registrar(
+                    conn,
+                    id_tenant=tenant_id,
+                    id_usuario=actor_id,
+                    tipo_operacion="USUARIO_CREADO",
+                    entidad_afectada="usuarios",
+                    id_entidad=row["id"],
+                    valor_nuevo={"email": payload.email, "rol": payload.rol.value},
+                )
+
         return _map_user(row)
 
     async def list_users(self, tenant_id: UUID) -> list[UserPublic]:

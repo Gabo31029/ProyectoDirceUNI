@@ -89,6 +89,10 @@ class UserCreate(BaseModel):
     nombre: str = Field(min_length=2, max_length=255)
     apellido: str = Field(min_length=2, max_length=255)
     rol: RolUsuario = Field(default=RolUsuario.ALUMNO)
+    # Campos opcionales de perfil para ALUMNO
+    codigo_alumno: str | None = None
+    id_plan_estudios: UUID | None = None
+    periodo_ingreso: str | None = None
 
 
 class UserUpdate(BaseModel):

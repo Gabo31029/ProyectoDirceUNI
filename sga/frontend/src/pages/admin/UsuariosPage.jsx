@@ -5,18 +5,29 @@ import Modal from '../../components/Modal'
 import Badge from '../../components/Badge'
 import ErrorAlert, { SuccessAlert } from '../../components/ErrorAlert'
 import { userService } from '../../services/userService'
+import { ofertaService } from '../../services/ofertaService'
 
 const ROLES = ['ALUMNO', 'DOCENTE', 'ADMIN']
 
 export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState([])
+  const [planes, setPlanes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editUser, setEditUser] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ nombre: '', apellido: '', email: '', password: '', rol: 'ALUMNO' })
+  const [form, setForm] = useState({
+    nombre: '',
+    apellido: '',
+    email: '',
+    password: '',
+    rol: 'ALUMNO',
+    codigo_alumno: '',
+    id_plan_estudios: '',
+    periodo_ingreso: ''
+  })
 
   const fetchUsers = async () => {
     try {
@@ -29,17 +40,47 @@ export default function UsuariosPage() {
     }
   }
 
-  useEffect(() => { fetchUsers() }, [])
+  const fetchPlanes = async () => {
+    try {
+      const data = await ofertaService.listarPlanes()
+      setPlanes(data)
+    } catch (e) {
+      console.error('Error al cargar planes de estudio:', e)
+    }
+  }
+
+  useEffect(() => {
+    fetchUsers()
+    fetchPlanes()
+  }, [])
 
   const openCreate = () => {
     setEditUser(null)
-    setForm({ nombre: '', apellido: '', email: '', password: '', rol: 'ALUMNO' })
+    setForm({
+      nombre: '',
+      apellido: '',
+      email: '',
+      password: '',
+      rol: 'ALUMNO',
+      codigo_alumno: '',
+      id_plan_estudios: '',
+      periodo_ingreso: ''
+    })
     setShowModal(true)
   }
 
   const openEdit = (u) => {
     setEditUser(u)
-    setForm({ nombre: u.nombre, apellido: u.apellido, email: u.email, password: '', rol: u.rol })
+    setForm({
+      nombre: u.nombre,
+      apellido: u.apellido,
+      email: u.email,
+      password: '',
+      rol: u.rol,
+      codigo_alumno: '',
+      id_plan_estudios: '',
+      periodo_ingreso: ''
+    })
     setShowModal(true)
   }
 
@@ -72,13 +113,26 @@ export default function UsuariosPage() {
           setSaving(false)
           return
         }
-        await userService.crear({
+        const payload = {
           nombre: trimmedNombre,
           apellido: trimmedApellido,
           email: trimmedEmail,
           password: trimmedPassword,
           rol: trimmedRol
-        })
+        }
+
+        if (trimmedRol === 'ALUMNO') {
+          if (!form.codigo_alumno.trim() || !form.id_plan_estudios || !form.periodo_ingreso.trim()) {
+            setError('Los campos de perfil del alumno son obligatorios (Código, Plan de Estudios y Periodo de Ingreso).')
+            setSaving(false)
+            return
+          }
+          payload.codigo_alumno = form.codigo_alumno.trim()
+          payload.id_plan_estudios = form.id_plan_estudios
+          payload.periodo_ingreso = form.periodo_ingreso.trim()
+        }
+
+        await userService.crear(payload)
         setSuccess('Usuario creado correctamente')
       }
       setShowModal(false)
@@ -192,6 +246,52 @@ export default function UsuariosPage() {
                     {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
+                {form.rol === 'ALUMNO' && (
+                  <div className="card" style={{ padding: '1rem', marginTop: '1rem', marginBottom: '1rem', backgroundColor: 'var(--bg-card-secondary, #f8f9fa)', border: '1px solid var(--border-color, #dee2e6)', borderRadius: '6px' }}>
+                    <h3 style={{ fontSize: '0.9rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>Detalles de Alumno</h3>
+                    <div className="grid-2">
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="student-code">Código de Alumno</label>
+                        <input
+                          id="student-code"
+                          className="form-input"
+                          value={form.codigo_alumno}
+                          onChange={e => setForm({ ...form, codigo_alumno: e.target.value })}
+                          placeholder="Ej: 20260001"
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" htmlFor="student-period">Periodo de Ingreso</label>
+                        <input
+                          id="student-period"
+                          className="form-input"
+                          value={form.periodo_ingreso}
+                          onChange={e => setForm({ ...form, periodo_ingreso: e.target.value })}
+                          placeholder="Ej: 2026-1"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                      <label className="form-label" htmlFor="student-plan">Plan de Estudios</label>
+                      <select
+                        id="student-plan"
+                        className="form-select"
+                        value={form.id_plan_estudios}
+                        onChange={e => setForm({ ...form, id_plan_estudios: e.target.value })}
+                        required
+                      >
+                        <option value="">-- Seleccionar Plan de Estudios --</option>
+                        {planes.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.carrera} - {p.version_plan} {p.estado === 'ACTIVO' ? '' : '(Borrador)'}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </>
             )}
             <div className="form-group">
