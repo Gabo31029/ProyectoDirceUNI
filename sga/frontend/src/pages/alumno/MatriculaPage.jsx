@@ -51,6 +51,16 @@ export default function MatriculaPage() {
 
   useEffect(() => { fetchData() }, [auth?.id])
 
+  useEffect(() => {
+    if (!periodo?.id) return
+    const interval = setInterval(() => {
+      ofertaService.listarSecciones(periodo.id)
+        .then(setSecciones)
+        .catch(() => {})
+    }, 5000) // Poll every 5 seconds to update vacancies in "real-time" for simulations
+    return () => clearInterval(interval)
+  }, [periodo?.id])
+
   const handleCrearMatricula = async () => {
     if (!periodo) return
     setSaving(true)
@@ -76,6 +86,10 @@ export default function MatriculaPage() {
       setShowInscModal(false)
       const insc = await matriculaService.listarInscripciones(selectedMatricula.id)
       setInscripciones(insc)
+      // Immediately refresh sections/vacancies list
+      if (periodo?.id) {
+        ofertaService.listarSecciones(periodo.id).then(setSecciones).catch(() => {})
+      }
     } catch (e) {
       setError(e.response?.data?.detail || 'Error al inscribirse')
     } finally {
@@ -93,6 +107,10 @@ export default function MatriculaPage() {
       setShowRetiroModal(false)
       const insc = await matriculaService.listarInscripciones(selectedMatricula.id)
       setInscripciones(insc)
+      // Immediately refresh sections/vacancies list
+      if (periodo?.id) {
+        ofertaService.listarSecciones(periodo.id).then(setSecciones).catch(() => {})
+      }
     } catch (e) {
       setError(e.response?.data?.detail || 'Error al procesar el retiro')
     } finally {
