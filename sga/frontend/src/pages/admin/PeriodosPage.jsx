@@ -5,9 +5,31 @@ import Modal from '../../components/Modal'
 import Badge from '../../components/Badge'
 import ErrorAlert, { SuccessAlert } from '../../components/ErrorAlert'
 import { periodoService } from '../../services/periodoService'
+import { tenantService } from '../../services/tenantService'
+import { useAuth } from '../../context/AuthContext'
 
 const ESTADOS = ['CONFIGURACION', 'MATRICULA', 'REGISTRO_NOTAS', 'CERRADO']
 const TABS_POLITICAS = ['Turnos de Matrícula', 'Condición', 'Retiro', 'Reserva', 'Fórmula', 'Dispersión']
+
+const LABEL_MAP = {
+  tipo_condicion: 'Condición Académica',
+  cuenta_evaluada: 'Evaluación del Alumno de',
+  umbral: 'Umbral',
+  operador: 'Operador',
+  accion_resultante: 'Acción Resultante',
+  fecha_hora_inicio: 'Fecha Inicio',
+  creditos_maximos: 'Créditos Máx.',
+  ppa_minimo: 'PPA Mín.',
+  ppa_maximo: 'PPA Máx.',
+  tipo_retiro: 'Tipo Retiro',
+  semana_limite: 'Semana Límite',
+  condiciones_bloqueantes: 'Bloqueante',
+  max_periodos_consecutivos: 'Consecutivos Máx.',
+  max_periodos_alternos: 'Alternos Máx.',
+  tipo_promedio: 'Tipo Promedio',
+  expresion_calculo: 'Fórmula',
+  exponente_dispersion: 'Exponente Dispersión'
+}
 
 export default function PeriodosPage() {
   const [periodos, setPeriodos] = useState([])
@@ -24,6 +46,8 @@ export default function PeriodosPage() {
   const [form, setForm] = useState({ nombre_periodo: '', fecha_inicio: '', fecha_fin: '' })
   const [polForm, setPolForm] = useState({})
   const [transEstado, setTransEstado] = useState('')
+  const [tiposCondicion, setTiposCondicion] = useState([])
+  const { auth } = useAuth()
 
   const fetchPeriodos = async () => {
     try {
@@ -61,6 +85,12 @@ export default function PeriodosPage() {
     setSelectedPeriodo(p)
     setPoliticasTab(0)
     await loadPoliticas(p.id, 0)
+    try {
+      const tc = await tenantService.listarTiposCondicion(auth.tenantId)
+      setTiposCondicion(tc)
+    } catch (err) {
+      console.error(err)
+    }
     setShowPoliticasModal(true)
     setPolForm({})
   }
@@ -160,8 +190,31 @@ export default function PeriodosPage() {
     if (politicasTab === 1) return (
       <div className="grid-2">
         <div className="form-group">
-          <label className="form-label" htmlFor="pol-cuenta">Cuenta Evaluada</label>
-          <input id="pol-cuenta" className="form-input" value={f.cuenta_evaluada || ''} onChange={e => set('cuenta_evaluada', e.target.value)} />
+          <label className="form-label" htmlFor="pol-tipo-condicion">Tipo de Condición Académica</label>
+          <select 
+            id="pol-tipo-condicion" 
+            className="form-select" 
+            value={f.id_tipo_condicion || ''} 
+            onChange={e => set('id_tipo_condicion', e.target.value)}
+            required
+          >
+            <option value="">Selecciona...</option>
+            {tiposCondicion.map(tc => (
+              <option key={tc.id} value={tc.id}>{tc.nombre} ({tc.codigo})</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label" htmlFor="pol-cuenta">Evaluación de condición del alumno de:</label>
+          <select id="pol-cuenta" className="form-select" value={f.cuenta_evaluada || ''} onChange={e => set('cuenta_evaluada', e.target.value)}>
+            <option value="">Selecciona...</option>
+            <option value="CTA-DESAPROBACIONES">Cursos Desaprobados (CTA-DESAPROBACIONES)</option>
+            <option value="CTA-CREDITOS-APROBADOS">Créditos Aprobados (CTA-CREDITOS-APROBADOS)</option>
+            <option value="CTA-CREDITOS-INSCRITOS">Créditos Inscritos (CTA-CREDITOS-INSCRITOS)</option>
+            <option value="CTA-RESERVAS-MATRICULA">Reservas de Matrícula (CTA-RESERVAS-MATRICULA)</option>
+            <option value="CTA-CONDICION-ACADEMICA">Condición Académica (CTA-CONDICION-ACADEMICA)</option>
+            <option value="CTA-PROMEDIO-SNAPSHOT">Snapshot de Promedio (CTA-PROMEDIO-SNAPSHOT)</option>
+          </select>
         </div>
         <div className="form-group">
           <label className="form-label" htmlFor="pol-umbral">Umbral</label>
@@ -389,9 +442,9 @@ export default function PeriodosPage() {
                     padding: '12px 16px', marginBottom: 8, fontSize: '0.825rem',
                     border: '1px solid var(--border)'
                   }}>
-                    {Object.entries(p).filter(([k]) => !['id', 'id_periodo', 'id_tenant', 'id_tipo_condicion', 'created_at'].includes(k)).map(([k, v]) => (
+                    {Object.entries(p).filter(([k]) => !['id', 'id_periodo', 'id_tenant', 'id_tipo_condicion', 'codigo_condicion', 'created_at'].includes(k)).map(([k, v]) => (
                       <span key={k} style={{ marginRight: 16, color: 'var(--text-secondary)' }}>
-                        <strong style={{ color: 'var(--text-primary)' }}>{k === 'fecha_hora_inicio' ? 'fecha_inicio' : k}:</strong>{' '}
+                        <strong style={{ color: 'var(--text-primary)' }}>{LABEL_MAP[k] || k}:</strong>{' '}
                         {k === 'fecha_hora_inicio' ? new Date(v).toLocaleString('es-PE') : String(v)}
                       </span>
                     ))}

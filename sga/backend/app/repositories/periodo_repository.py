@@ -179,7 +179,12 @@ class PeriodoRepository:
     async def get_politicas_condicion_by_periodo(self, id_periodo: UUID) -> list[asyncpg.Record]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM politica_condicion_academica WHERE id_periodo = $1",
+                """
+                SELECT p.*, c.nombre AS tipo_condicion, c.codigo AS codigo_condicion
+                FROM politica_condicion_academica p
+                LEFT JOIN cat_tipo_condicion c ON p.id_tipo_condicion = c.id
+                WHERE p.id_periodo = $1
+                """,
                 id_periodo,
             )
             return list(rows)

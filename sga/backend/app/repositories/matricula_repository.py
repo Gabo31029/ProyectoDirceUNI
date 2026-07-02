@@ -92,7 +92,26 @@ class MatriculaRepository:
         if not turn_policies:
             return 1, None # Turno 1 por defecto, sin restricciones de horario
             
-        # 2. Obtener alumnos activos ordenados por PPA desc
+        # Verificar si el alumno tiene condición activa de RIESGO_ACADEMICO
+        in_risk = await self.pool.fetchval(
+            """
+            SELECT EXISTS (
+                SELECT 1
+                FROM condicion_academica_alumno caa
+                JOIN tipo_condicion_academica tca ON caa.id_tipo_condicion = tca.id_tipo_condicion
+                JOIN perfil_alumno pa ON pa.id_perfil_alumno = caa.id_perfil_alumno
+                WHERE pa.id_usuario = $1
+                  AND caa.estado = 'ACTIVA'
+                  AND tca.codigo = 'RIESGO_ACADEMICO'
+            )
+            """,
+            alumno_id,
+        )
+        if in_risk:
+            # Los alumnos en riesgo se matriculan siempre en el primer turno
+            return 1, turn_policies[0]["fecha_hora_inicio"]
+
+        # 2. Obtener alumnos activos ordenados por PPA desc (excluyendo riesgo académico)
         students = await self.pool.fetch(
             """
             SELECT pa.id_usuario, 
@@ -100,6 +119,14 @@ class MatriculaRepository:
             FROM perfil_alumno pa
             JOIN usuarios u ON u.id = pa.id_usuario
             WHERE u.id_tenant = $1 AND u.activo = TRUE
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM condicion_academica_alumno caa
+                  JOIN tipo_condicion_academica tca ON caa.id_tipo_condicion = tca.id_tipo_condicion
+                  WHERE caa.id_perfil_alumno = pa.id_perfil_alumno
+                    AND caa.estado = 'ACTIVA'
+                    AND tca.codigo = 'RIESGO_ACADEMICO'
+              )
             ORDER BY ppa DESC, pa.codigo_alumno ASC
             """,
             tenant_id,
@@ -140,42 +167,88 @@ class MatriculaRepository:
         if not turn_policies:
             return
             
-        students = await conn.fetch(
+        # Regular students (excluding risk)
+        students_regular = await conn.fetch(
             """
             SELECT pa.id_usuario, 
                    COALESCE((SELECT ppa FROM snapshot_promedio WHERE id_perfil_alumno = pa.id_perfil_alumno ORDER BY created_at DESC LIMIT 1), 14.00) as ppa
             FROM perfil_alumno pa
             JOIN usuarios u ON u.id = pa.id_usuario
             WHERE u.id_tenant = $1 AND u.activo = TRUE
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM condicion_academica_alumno caa
+                  JOIN tipo_condicion_academica tca ON caa.id_tipo_condicion = tca.id_tipo_condicion
+                  WHERE caa.id_perfil_alumno = pa.id_perfil_alumno
+                    AND caa.estado = 'ACTIVA'
+                    AND tca.codigo = 'RIESGO_ACADEMICO'
+              )
             ORDER BY ppa DESC, pa.codigo_alumno ASC
+            """,
+            tenant_id,
+        )
+
+        # Risk students (assigned to Turn 1)
+        students_risk = await conn.fetch(
+            """
+            SELECT pa.id_usuario
+            FROM perfil_alumno pa
+            JOIN usuarios u ON u.id = pa.id_usuario
+            WHERE u.id_tenant = $1 AND u.activo = TRUE
+              AND EXISTS (
+                  SELECT 1
+                  FROM condicion_academica_alumno caa
+                  JOIN tipo_condicion_academica tca ON caa.id_tipo_condicion = tca.id_tipo_condicion
+                  WHERE caa.id_perfil_alumno = pa.id_perfil_alumno
+                    AND caa.estado = 'ACTIVA'
+                    AND tca.codigo = 'RIESGO_ACADEMICO'
+              )
             """,
             tenant_id,
         )
         
         import math
         N = len(turn_policies)
-        total_students = len(students)
-        if total_students == 0 or N == 0:
-            return
-        students_per_turn = math.ceil(total_students / N)
-        if students_per_turn <= 0:
-            students_per_turn = 1
-            
-        for idx, s in enumerate(students):
-            turn_index = min(idx // students_per_turn, N - 1)
-            policy = turn_policies[turn_index]
-            await conn.execute(
-                """
-                UPDATE matricula
-                SET numero_turno = $1, fecha_hora_turno = $2
-                WHERE id_alumno = $3 AND id_periodo = $4 AND id_tenant = $5
-                """,
-                policy["numero_turno"],
-                policy["fecha_hora_inicio"],
-                s["id_usuario"],
-                periodo_id,
-                tenant_id,
-            )
+        total_regular = len(students_regular)
+        
+        # 1. Update regular students using regular division
+        if total_regular > 0 and N > 0:
+            students_per_turn = math.ceil(total_regular / N)
+            if students_per_turn <= 0:
+                students_per_turn = 1
+                
+            for idx, s in enumerate(students_regular):
+                turn_index = min(idx // students_per_turn, N - 1)
+                policy = turn_policies[turn_index]
+                await conn.execute(
+                    """
+                    UPDATE matricula
+                    SET numero_turno = $1, fecha_hora_turno = $2
+                    WHERE id_alumno = $3 AND id_periodo = $4 AND id_tenant = $5
+                    """,
+                    policy["numero_turno"],
+                    policy["fecha_hora_inicio"],
+                    s["id_usuario"],
+                    periodo_id,
+                    tenant_id,
+                )
+
+        # 2. Update risk students directly to Turn 1
+        if len(students_risk) > 0 and N > 0:
+            policy_t1 = turn_policies[0]
+            for s in students_risk:
+                await conn.execute(
+                    """
+                    UPDATE matricula
+                    SET numero_turno = $1, fecha_hora_turno = $2
+                    WHERE id_alumno = $3 AND id_periodo = $4 AND id_tenant = $5
+                    """,
+                    policy_t1["numero_turno"],
+                    policy_t1["fecha_hora_inicio"],
+                    s["id_usuario"],
+                    periodo_id,
+                    tenant_id,
+                )
 
     async def create_matricula(
         self,

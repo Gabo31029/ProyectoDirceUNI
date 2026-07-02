@@ -18,7 +18,7 @@ class FormulaPromedio(Base):
     """
     __tablename__ = "formula_promedio"
 
-    id_formula = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id_formula = Column("id", String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     id_periodo = Column(String(36), ForeignKey("periodo_academico.id_periodo", ondelete="RESTRICT"), nullable=False)
     tipo_promedio = Column(String(10), nullable=False)   # PPS, PPA
     expresion_calculo = Column(String(500), nullable=False)
@@ -57,7 +57,7 @@ class SnapshotPromedio(Base):
     id_tenant = Column(String(36), ForeignKey("tenants.id_tenant", ondelete="RESTRICT"), nullable=False)
     pps = Column(Numeric(5, 2), nullable=False)
     ppa = Column(Numeric(5, 2), nullable=False)
-    id_formula_aplicada = Column(String(36), ForeignKey("formula_promedio.id_formula", ondelete="RESTRICT"), nullable=True)
+    id_formula_aplicada = Column(String(36), ForeignKey("formula_promedio.id", ondelete="RESTRICT"), nullable=True)
     fecha_generacion = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     id_snapshot_anterior = Column(String(36), ForeignKey("snapshot_promedio.id_snapshot", ondelete="RESTRICT"), nullable=True)
     id_evento_correc = Column(String(36), ForeignKey("evento_academico.id_evento", ondelete="RESTRICT"), nullable=True)
@@ -121,7 +121,7 @@ class PoliticaCondicionAcademica(Base):
     """
     __tablename__ = "politica_condicion_academica"
 
-    id_politica_condicion = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id_politica_condicion = Column("id", String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     id_periodo = Column(String(36), ForeignKey("periodo_academico.id_periodo", ondelete="RESTRICT"), nullable=False)
     id_tipo_condicion = Column(String(36), ForeignKey("tipo_condicion_academica.id_tipo_condicion", ondelete="RESTRICT"), nullable=False)
     cuenta_evaluada = Column(String(50), nullable=False)

@@ -293,9 +293,13 @@ class PeriodoService:
         if periodo["estado"] != PeriodoEstado.CONFIGURACION.value:
             raise ValidationError("Solo se pueden agregar políticas en estado CONFIGURACION.")
 
+        id_tipo_condicion = payload["id_tipo_condicion"]
+        if not isinstance(id_tipo_condicion, UUID):
+            id_tipo_condicion = UUID(str(id_tipo_condicion))
+
         row = await self.repo.create_politica_condicion(
             id_periodo=periodo_id,
-            id_tipo_condicion=UUID(payload["id_tipo_condicion"]),
+            id_tipo_condicion=id_tipo_condicion,
             cuenta_evaluada=payload["cuenta_evaluada"],
             umbral=Decimal(str(payload["umbral"])),
             operador=payload["operador"],

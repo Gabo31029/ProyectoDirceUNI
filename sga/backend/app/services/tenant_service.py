@@ -36,6 +36,7 @@ class TenantService:
     async def create_tenant(
         self, payload: TenantCreate, *, actor_id: UUID
     ) -> TenantResponse:
+        import uuid
         try:
             validar_dominio_tenant(payload.dominio)
         except ValueError as exc:
@@ -49,16 +50,49 @@ class TenantService:
             dominio=payload.dominio,
             zona_horaria=payload.zona_horaria,
         )
+
         async with self.pool.acquire() as conn:
-            await self.audit_repo.registrar(
-                conn,
-                id_tenant=row["id"],
-                id_usuario=actor_id,
-                tipo_operacion="TENANT_CREADO",
-                entidad_afectada="tenants",
-                id_entidad=row["id"],
-                valor_nuevo={"nombre": payload.nombre, "dominio": payload.dominio},
-            )
+            async with conn.transaction():
+                default_conditions = [
+                    ("PRUEBA_ACADEMICA", "Prueba Académica", "El estudiante tiene un rendimiento deficiente y se encuentra en periodo de prueba."),
+                    ("RIESGO_ACADEMICO", "Riesgo Académico", "El estudiante tiene un promedio ponderado bajo o desaprobaciones acumuladas."),
+                    ("SANCIONADO", "Sancionado", "El estudiante tiene una sanción disciplinaria o académica."),
+                    ("EGRESADO", "Egresado", "El estudiante ha completado satisfactoriamente los requisitos del plan.")
+                ]
+                for codigo, nombre, descripcion in default_conditions:
+                    cond_id = uuid.uuid4()
+                    await conn.execute(
+                        """
+                        INSERT INTO cat_tipo_condicion (id, id_tenant, codigo, nombre, descripcion)
+                        VALUES ($1, $2, $3, $4, $5)
+                        """,
+                        cond_id,
+                        row["id"],
+                        codigo,
+                        nombre,
+                        descripcion,
+                    )
+                    await conn.execute(
+                        """
+                        INSERT INTO tipo_condicion_academica (id_tipo_condicion, id_tenant, codigo, nombre, descripcion)
+                        VALUES ($1, $2, $3, $4, $5)
+                        """,
+                        cond_id,
+                        row["id_tenant"],
+                        codigo,
+                        nombre,
+                        descripcion,
+                    )
+
+                await self.audit_repo.registrar(
+                    conn,
+                    id_tenant=row["id"],
+                    id_usuario=actor_id,
+                    tipo_operacion="TENANT_CREADO",
+                    entidad_afectada="tenants",
+                    id_entidad=row["id"],
+                    valor_nuevo={"nombre": payload.nombre, "dominio": payload.dominio},
+                )
         return _map_tenant(row)
 
     async def list_tenants(self) -> list[TenantResponse]:

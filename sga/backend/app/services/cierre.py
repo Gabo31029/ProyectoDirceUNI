@@ -2,6 +2,7 @@ from typing import List
 from decimal import Decimal
 from datetime import datetime, timezone
 from fastapi import HTTPException, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser
@@ -417,12 +418,20 @@ def cerrar_periodo_academico(
             )
 
             for pol in politicas:
-                # Recuperar el valor actual de la métrica del estudiante (e.g. créditos desaprobados)
-                cuenta = db.query(CuentaSeguimientoAlumno).filter(
-                    CuentaSeguimientoAlumno.id_perfil_alumno == al.id_perfil_alumno,
-                    CuentaSeguimientoAlumno.tipo_cuenta == pol.cuenta_evaluada
-                ).first()
-                valor_cuenta = cuenta.valor_actual if cuenta else Decimal("0.00")
+                # Recuperar el valor actual de la métrica del estudiante
+                if pol.cuenta_evaluada == "CTA-DESAPROBACIONES":
+                    # Al ser course-specific, tomamos el máximo valor registrado en sus cursos
+                    max_des = db.query(CuentaSeguimientoAlumno.valor_actual).filter(
+                        CuentaSeguimientoAlumno.id_perfil_alumno == al.id_perfil_alumno,
+                        CuentaSeguimientoAlumno.tipo_cuenta == "CTA-DESAPROBACIONES"
+                    ).order_by(CuentaSeguimientoAlumno.valor_actual.desc()).first()
+                    valor_cuenta = max_des[0] if max_des else Decimal("0.00")
+                else:
+                    cuenta = db.query(CuentaSeguimientoAlumno).filter(
+                        CuentaSeguimientoAlumno.id_perfil_alumno == al.id_perfil_alumno,
+                        CuentaSeguimientoAlumno.tipo_cuenta == pol.cuenta_evaluada
+                    ).first()
+                    valor_cuenta = cuenta.valor_actual if cuenta else Decimal("0.00")
 
                 # Evaluar regla de comparación en dominio
                 triggered = evaluar_politica_condicion(valor_cuenta, pol.umbral, pol.operador)
@@ -444,7 +453,7 @@ def cerrar_periodo_academico(
                             codigo_evento="EVT-CONDICION-ACTIVADA",
                             id_actor=user.id_usuario,
                             entidad_afectada_tipo="condicion_academica_alumno",
-                            entidad_afectada_id="temp",
+                            entidad_afectada_id="00000000-0000-0000-0000-000000000000",
                             id_perfil_alumno=al.id_perfil_alumno,
                             valor_anterior=None,
                             valor_nuevo=cond_name,
@@ -468,6 +477,23 @@ def cerrar_periodo_academico(
                         event_cond.entidad_afectada_id = new_cond.id_condicion
                         db.add(event_cond)
                         db.flush()
+
+                        # Desactivación de cuenta en caso de expulsión/retiro
+                        is_expulsion = False
+                        if pol.accion_resultante in ("RETIRADO_DEFINITIVO", "EXPULSADO", "DESACTIVAR_CUENTA"):
+                            is_expulsion = True
+                        if tipo_cond and tipo_cond.codigo in ("RETIRADO_DEFINITIVO", "EXPULSADO"):
+                            is_expulsion = True
+
+                        if is_expulsion:
+                            db.execute(
+                                text("UPDATE usuarios SET activo = FALSE WHERE id = :id"),
+                                {"id": al.id_usuario}
+                            )
+                            db.execute(
+                                text("UPDATE usuario SET estado = 'INACTIVO' WHERE id_usuario = :id"),
+                                {"id": al.id_usuario}
+                            )
                 else:
                     # Si la condición está activa pero el estudiante ya no cumple con el criterio de riesgo,
                     # se procede a resolver automáticamente su situación.
