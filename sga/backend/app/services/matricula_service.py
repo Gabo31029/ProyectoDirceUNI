@@ -52,6 +52,8 @@ def _map_inscripcion(row: asyncpg.Record) -> InscripcionResponse:
         fecha_retiro=row["fecha_retiro"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        nombre_curso=row.get("nombre_curso"),
+        codigo_seccion=row.get("codigo_seccion"),
     )
 
 
@@ -320,7 +322,8 @@ class MatriculaService:
                     },
                 )
 
-        return _map_inscripcion(inscripcion)
+        full_inscripcion = await self.repo.get_inscripcion_by_id(inscripcion["id"], tenant_id)
+        return _map_inscripcion(full_inscripcion)
 
     async def retirar_curso(
         self,
@@ -405,7 +408,8 @@ class MatriculaService:
                     },
                 )
 
-        return _map_inscripcion(retirada)
+        full_retirada = await self.repo.get_inscripcion_by_id(inscripcion_id, tenant_id)
+        return _map_inscripcion(full_retirada)
 
     async def list_inscripciones(
         self,

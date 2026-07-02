@@ -235,7 +235,8 @@ export default function MatriculaPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>ID Sección</th>
+                      <th>Curso</th>
+                      <th>Sección</th>
                       <th>Estado</th>
                       <th>Créditos</th>
                       <th>Fecha Inscripción</th>
@@ -246,7 +247,8 @@ export default function MatriculaPage() {
                   <tbody>
                     {inscripciones.map(insc => (
                       <tr key={insc.id}>
-                        <td className="cell-primary">{insc.id_seccion}</td>
+                        <td className="cell-primary">{insc.nombre_curso || 'Cargando...'}</td>
+                        <td>{insc.codigo_seccion || 'Cargando...'}</td>
                         <td><Badge value={insc.estado} dot /></td>
                         <td>{insc.creditos}</td>
                         <td>{new Date(insc.fecha_inscripcion).toLocaleDateString('es-PE')}</td>

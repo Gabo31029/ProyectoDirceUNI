@@ -358,7 +358,13 @@ class MatriculaRepository:
         self, inscripcion_id: UUID, tenant_id: UUID
     ) -> asyncpg.Record | None:
         return await self.pool.fetchrow(
-            "SELECT * FROM inscripcion WHERE id = $1 AND id_tenant = $2",
+            """
+            SELECT i.*, c.nombre_curso, s.codigo_seccion
+            FROM inscripcion i
+            JOIN seccion s ON i.id_seccion = s.id
+            JOIN curso c ON i.id_curso = c.id
+            WHERE i.id = $1 AND i.id_tenant = $2
+            """,
             inscripcion_id,
             tenant_id,
         )
@@ -368,9 +374,12 @@ class MatriculaRepository:
     ) -> list[asyncpg.Record]:
         rows = await self.pool.fetch(
             """
-            SELECT * FROM inscripcion
-            WHERE id_matricula = $1 AND id_tenant = $2
-            ORDER BY fecha_inscripcion DESC
+            SELECT i.*, c.nombre_curso, s.codigo_seccion
+            FROM inscripcion i
+            JOIN seccion s ON i.id_seccion = s.id
+            JOIN curso c ON i.id_curso = c.id
+            WHERE i.id_matricula = $1 AND i.id_tenant = $2
+            ORDER BY i.fecha_inscripcion DESC
             """,
             matricula_id,
             tenant_id,

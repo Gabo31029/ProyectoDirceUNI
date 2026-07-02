@@ -475,6 +475,8 @@ class InscripcionResponse(BaseModel):
     fecha_retiro: datetime | None
     created_at: datetime
     updated_at: datetime
+    nombre_curso: str | None = None
+    codigo_seccion: str | None = None
 
 
 class RetiroRequest(BaseModel):
