@@ -47,7 +47,6 @@ export default function CalificacionesPage() {
       .then(list => { setEvaluaciones(list); setSelectedEvaluacion('') })
       .catch(() => setEvaluaciones([]))
   }, [selectedSeccion])
-
   // Cargar alumnos inscritos cuando cambia la sección
   useEffect(() => {
     if (!selectedSeccion) { setInscripciones([]); setNotas({}); return }
