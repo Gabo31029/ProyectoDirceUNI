@@ -44,10 +44,20 @@ def registrar_calificaciones(
     - Trazabilidad y transaccionalidad: Registra un log de auditoría. Si ocurre cualquier error,
       se ejecuta un rollback de la transacción de base de datos.
     """
-    # 1. Autorización de Rol
+    # 1. Resolve seccion first
+    seccion = db.query(Seccion).filter(
+        (Seccion.id_seccion == id_seccion) | (Seccion.id == id_seccion)
+    ).first()
+    if not seccion:
+        log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
+                  "seccion", id_seccion, "RECHAZADA", motivo_rechazo="Sección no encontrada.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Sección no encontrada.")
+
+    # 2. Autorización de Rol
     if user.rol not in ("DOCENTE", "ADMINISTRADOR"):
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                  "seccion", id_seccion, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
+                  "seccion", seccion.id_seccion, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No autorizado para registrar calificaciones.")
 
@@ -55,53 +65,55 @@ def registrar_calificaciones(
     if user.rol == "DOCENTE":
         docente_perfil_id = user.id_perfil or ""
         is_assigned = db.query(AsignacionDocenteSeccion).filter(
-            AsignacionDocenteSeccion.id_seccion == id_seccion,
+            AsignacionDocenteSeccion.id_seccion == seccion.id_seccion,
             AsignacionDocenteSeccion.id_perfil_docente == docente_perfil_id
         ).first()
         if not is_assigned and not docente_perfil_id.startswith("profile-docente-mock"):
             log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                      "seccion", id_seccion, "RECHAZADA", motivo_rechazo="Docente no asignado a esta sección.")
+                      "seccion", seccion.id_seccion, "RECHAZADA", motivo_rechazo="Docente no asignado a esta sección.")
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="El docente no está asignado a esta sección.")
 
-    # 2. Recuperar y validar existencia de la Evaluación
-    evaluacion = evaluacion_repo.get(db, id_evaluacion)
-    if not evaluacion or evaluacion.id_seccion != id_seccion:
+    # 3. Recuperar y validar existencia de la Evaluación
+    evaluacion = db.query(EvaluacionAcademica).filter(
+        (EvaluacionAcademica.id_evaluacion == id_evaluacion) | (EvaluacionAcademica.id == id_evaluacion)
+    ).first()
+    if not evaluacion or evaluacion.id_seccion != seccion.id_seccion:
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
                   "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo="Evaluación no encontrada.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Evaluación no encontrada.")
 
-    # 3. Verificación de estado de flujo del acta
+    # 4. Verificación de estado de flujo del acta
     if not can_modify_grades(evaluacion.estado):
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                  "evaluacion", id_evaluacion, "RECHAZADA",
+                  "evaluacion", evaluacion.id_evaluacion, "RECHAZADA",
                   motivo_rechazo="La evaluación no está en estado BORRADOR.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="No se pueden modificar calificaciones en una evaluación publicada o cerrada.")
 
-    # 4. Recuperar la escala de evaluación asociada para validar límites
+    # 5. Recuperar la escala de evaluación asociada para validar límites
     escala = db.query(EscalaEvaluacion).filter(
         EscalaEvaluacion.id_escala == evaluacion.id_escala
     ).first()
     if not escala:
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                  "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo="Escala de evaluación no configurada.")
+                  "evaluacion", evaluacion.id_evaluacion, "RECHAZADA", motivo_rechazo="Escala de evaluación no configurada.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Escala de evaluación no encontrada.")
 
     res_calificaciones = []
 
     try:
-        # 5. Procesar lote de calificaciones
+        # 6. Procesar lote de calificaciones
         for item in calificaciones_in:
             insc_id = item["id_inscripcion"]
             nota_val = Decimal(str(item["valor_nota"]))
 
             # Validar que la inscripción pertenece a la sección académica
             inscripcion = db.query(Inscripcion).filter(
-                Inscripcion.id_inscripcion == insc_id,
-                Inscripcion.id_seccion == id_seccion
+                (Inscripcion.id_inscripcion == insc_id) | (Inscripcion.id == insc_id),
+                Inscripcion.id_seccion == seccion.id_seccion
             ).first()
             if not inscripcion:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -118,7 +130,7 @@ def registrar_calificaciones(
             validate_grade_value(nota_val, escala.nota_minima, escala.nota_maxima)
 
             # Guardar en base de datos: Crear o actualizar
-            calif = calificacion_repo.get_by_inscripcion_and_evaluacion(db, insc_id, id_evaluacion)
+            calif = calificacion_repo.get_by_inscripcion_and_evaluacion(db, inscripcion.id_inscripcion, evaluacion.id_evaluacion)
             if calif:
                 calif.valor_nota = nota_val
                 calif.id_docente_ingreso = user.id_perfil or "mock-docente-id"
@@ -126,8 +138,8 @@ def registrar_calificaciones(
                 db.add(calif)
             else:
                 calif_data = {
-                    "id_inscripcion": insc_id,
-                    "id_evaluacion": id_evaluacion,
+                    "id_inscripcion": inscripcion.id_inscripcion,
+                    "id_evaluacion": evaluacion.id_evaluacion,
                     "valor_nota": nota_val,
                     "estado": "BORRADOR",
                     "id_docente_ingreso": user.id_perfil or "mock-docente-id"
@@ -171,26 +183,38 @@ def publicar_evaluacion(
       individuales asociadas a ella a 'PUBLICADO'.
     - Registra un evento académico inmutable ('EVT-NOTA-EVALUACION-PUBLICADA') en la bitácora institucional.
     """
-    # 1. Recuperar Evaluación
-    evaluacion = evaluacion_repo.get(db, id_evaluacion)
-    if not evaluacion or evaluacion.id_seccion != id_seccion:
+    # 1. Resolve seccion first
+    seccion = db.query(Seccion).filter(
+        (Seccion.id_seccion == id_seccion) | (Seccion.id == id_seccion)
+    ).first()
+    if not seccion:
+        log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
+                  "seccion", id_seccion, "RECHAZADA", motivo_rechazo="Sección no encontrada.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Sección no encontrada.")
+
+    # 2. Recuperar Evaluación
+    evaluacion = db.query(EvaluacionAcademica).filter(
+        (EvaluacionAcademica.id_evaluacion == id_evaluacion) | (EvaluacionAcademica.id == id_evaluacion)
+    ).first()
+    if not evaluacion or evaluacion.id_seccion != seccion.id_seccion:
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
                   "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo="Evaluación no encontrada.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Evaluación no encontrada.")
 
-    # 2. Validar transición de estado
+    # 3. Validar transición de estado
     if not can_publish_evaluation(evaluacion.estado):
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                  "evaluacion", id_evaluacion, "RECHAZADA",
+                  "evaluacion", evaluacion.id_evaluacion, "RECHAZADA",
                   motivo_rechazo="La evaluación no está en estado BORRADOR.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="La evaluación ya se encuentra publicada o cerrada.")
 
-    # 3. Control de Accesos
+    # 4. Control de Accesos
     if user.rol not in ("ADMINISTRADOR", "DOCENTE"):
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                  "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
+                  "evaluacion", evaluacion.id_evaluacion, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="No autorizado para publicar evaluaciones.")
 
@@ -198,13 +222,13 @@ def publicar_evaluacion(
     if user.rol == "DOCENTE":
         docente_perfil_id = user.id_perfil or ""
         is_coord = db.query(AsignacionDocenteSeccion).filter(
-            AsignacionDocenteSeccion.id_seccion == id_seccion,
+            AsignacionDocenteSeccion.id_seccion == seccion.id_seccion,
             AsignacionDocenteSeccion.id_perfil_docente == docente_perfil_id,
             AsignacionDocenteSeccion.es_coordinador.is_(True)
         ).first()
         if not is_coord and not docente_perfil_id.startswith("profile-docente-mock"):
             log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                      "evaluacion", id_evaluacion, "RECHAZADA",
+                      "evaluacion", evaluacion.id_evaluacion, "RECHAZADA",
                       motivo_rechazo="Docente no es coordinador.")
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="Solo el docente coordinador de la sección puede publicar calificaciones.")

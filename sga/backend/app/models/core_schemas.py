@@ -151,6 +151,7 @@ class PeriodoAcademico(Base):
     __tablename__ = "periodo_academico"
     
     id_periodo = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(String(36), unique=True, nullable=True)
     id_tenant = Column(String(36), ForeignKey("tenants.id_tenant", ondelete="RESTRICT"), nullable=False)
     nombre_periodo = Column(String(20), nullable=False)
     fecha_inicio = Column(Date, nullable=False)
@@ -208,6 +209,7 @@ class Seccion(Base):
     __tablename__ = "seccion"
     
     id_seccion = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(String(36), unique=True, nullable=True)
     id_tenant = Column(String(36), ForeignKey("tenants.id_tenant", ondelete="RESTRICT"), nullable=False)
     id_periodo = Column(String(36), ForeignKey("periodo_academico.id_periodo", ondelete="RESTRICT"), nullable=False)
     id_curso = Column(String(36), ForeignKey("curso.id_curso", ondelete="RESTRICT"), nullable=False)
@@ -272,6 +274,7 @@ class Inscripcion(Base):
     __tablename__ = "inscripcion"
     
     id_inscripcion = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(String(36), unique=True, nullable=True)
     id_matricula = Column(String(36), ForeignKey("matricula.id_matricula", ondelete="RESTRICT"), nullable=False)
     id_seccion = Column(String(36), ForeignKey("seccion.id_seccion", ondelete="RESTRICT"), nullable=False)
     estado = Column(String(15), nullable=False, default="ACTIVA")  # ACTIVA, RETIRADA, APROBADA, DESAPROBADA, ANULADA
