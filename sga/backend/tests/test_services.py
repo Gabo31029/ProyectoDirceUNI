@@ -18,8 +18,13 @@ from app.services.oferta_service import OfertaService
 def mock_pool():
     pool = MagicMock()
     mock_conn = AsyncMock()
+    
+    mock_transaction = AsyncMock()
+    mock_conn.transaction = MagicMock(return_value=mock_transaction)
+    
     pool.acquire.return_value.__aenter__.return_value = mock_conn
     return pool
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AUTH SERVICE TESTS
@@ -375,7 +380,9 @@ async def test_oferta_crear_curso_success(mock_pool) -> None:
     )
 
     service.repo.get_curso_by_codigo.return_value = None
-    service.repo.create_curso.return_value = {
+    
+    mock_conn = mock_pool.acquire.return_value.__aenter__.return_value
+    mock_conn.fetchrow.return_value = {
         "id": curso_id,
         "id_tenant": tenant_id,
         "codigo_curso": "SYS101",
@@ -421,7 +428,9 @@ async def test_oferta_crear_seccion_success(mock_pool) -> None:
         "id": curso_id
     }
     service.repo.get_seccion_by_codigo.return_value = None
-    service.repo.create_seccion.return_value = {
+    
+    mock_conn = mock_pool.acquire.return_value.__aenter__.return_value
+    mock_conn.fetchrow.return_value = {
         "id": seccion_id,
         "id_tenant": tenant_id,
         "id_periodo": periodo_id,
@@ -433,6 +442,7 @@ async def test_oferta_crear_seccion_success(mock_pool) -> None:
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC)
     }
+    mock_conn.fetch.return_value = [{"cnt": 0}]
 
     res = await service.crear_seccion(tenant_id, payload, actor_id=actor_id)
 

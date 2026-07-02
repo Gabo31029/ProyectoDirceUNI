@@ -30,6 +30,7 @@ export default function CatalogosPage() {
   useEffect(() => {
     if (!selectedTenant) return
     loadData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTenant, activeTab])
 
   const loadData = async () => {

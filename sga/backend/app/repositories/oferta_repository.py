@@ -310,7 +310,13 @@ class OfertaRepository:
     async def list_evaluaciones_by_seccion(self, id_seccion: UUID) -> list[asyncpg.Record]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM evaluacion_academica WHERE id_seccion = $1 ORDER BY orden_presentacion, created_at",
+                """
+                SELECT ea.*, cte.nombre AS nombre_tipo_evaluacion
+                FROM evaluacion_academica ea
+                JOIN cat_tipo_evaluacion cte ON ea.id_tipo_evaluacion = cte.id
+                WHERE ea.id_seccion = $1
+                ORDER BY ea.orden_presentacion, ea.created_at
+                """,
                 id_seccion,
             )
             return list(rows)
