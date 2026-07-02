@@ -13,8 +13,8 @@ export default function CalificacionesPage() {
   const [selectedPeriodo, setSelectedPeriodo] = useState('')
   const [secciones, setSecciones] = useState([])
   const [selectedSeccion, setSelectedSeccion] = useState('')
-  const [componentes, setComponentes] = useState([])
-  const [selectedComponente, setSelectedComponente] = useState('')
+  const [evaluaciones, setEvaluaciones] = useState([])
+  const [selectedEvaluacion, setSelectedEvaluacion] = useState('')
   const [inscripciones, setInscripciones] = useState([])
   const [notas, setNotas] = useState({})
   const [loading, setLoading] = useState(false)
@@ -37,28 +37,26 @@ export default function CalificacionesPage() {
   useEffect(() => {
     if (!selectedPeriodo) return
     ofertaService.listarSecciones(selectedPeriodo)
-      .then(list => { setSecciones(list); setSelectedSeccion(''); setComponentes([]); setSelectedComponente('') })
+      .then(list => { setSecciones(list); setSelectedSeccion(''); setEvaluaciones([]); setSelectedEvaluacion('') })
       .catch(() => setSecciones([]))
   }, [selectedPeriodo])
 
   useEffect(() => {
     if (!selectedSeccion) return
-    ofertaService.listarComponentes(selectedSeccion)
-      .then(list => { setComponentes(list); setSelectedComponente('') })
-      .catch(() => setComponentes([]))
+    ofertaService.listarEvaluaciones(selectedSeccion)
+      .then(list => { setEvaluaciones(list); setSelectedEvaluacion('') })
+      .catch(() => setEvaluaciones([]))
   }, [selectedSeccion])
 
   useEffect(() => {
     if (!selectedSeccion) { setInscripciones([]); return }
-    // We'd need to know the matricula IDs - this requires an admin endpoint to list inscriptions by section
-    // For now, we display the form allowing manual entry
     setInscripciones([])
   }, [selectedSeccion])
 
-  const compObj = componentes.find(c => c.id === selectedComponente)
+  const evalObj = evaluaciones.find(c => c.id === selectedEvaluacion)
 
   const handleRegistrar = async () => {
-    if (!selectedSeccion || !selectedComponente) return
+    if (!selectedSeccion || !selectedEvaluacion) return
     const calificaciones = Object.entries(notas)
       .filter(([, v]) => v !== '')
       .map(([id_inscripcion, valor_nota]) => ({ id_inscripcion, valor_nota: parseFloat(valor_nota) }))
@@ -69,7 +67,7 @@ export default function CalificacionesPage() {
     setSaving(true)
     setError('')
     try {
-      await calificacionService.registrar(selectedSeccion, selectedComponente, calificaciones)
+      await calificacionService.registrar(selectedSeccion, selectedEvaluacion, calificaciones)
       setSuccess(`${calificaciones.length} calificación(es) registrada(s) en borrador`)
       setNotas({})
     } catch (e) {
@@ -79,12 +77,12 @@ export default function CalificacionesPage() {
     }
   }
 
-  const handlePublicar = async (compId) => {
-    if (!window.confirm('¿Publicar este componente? Los alumnos podrán ver sus notas.')) return
+  const handlePublicar = async (evalId) => {
+    if (!window.confirm('¿Publicar esta evaluación? Los alumnos podrán ver sus notas.')) return
     try {
-      await calificacionService.publicar(selectedSeccion, compId)
-      setSuccess('Componente publicado correctamente')
-      ofertaService.listarComponentes(selectedSeccion).then(setComponentes)
+      await calificacionService.publicar(selectedSeccion, evalId)
+      setSuccess('Evaluación publicada correctamente')
+      ofertaService.listarEvaluaciones(selectedSeccion).then(setEvaluaciones)
     } catch (e) {
       setError(e.response?.data?.detail || 'Error al publicar')
     }
@@ -119,7 +117,7 @@ export default function CalificacionesPage() {
 
         {/* Filtros */}
         <div className="card mb-6">
-          <h3 style={{ marginBottom: 16 }}>Seleccionar Sección y Componente</h3>
+          <h3 style={{ marginBottom: 16 }}>Seleccionar Sección y Evaluación</h3>
           <div className="grid-3">
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" htmlFor="sel-periodo-cal">Período</label>
@@ -135,21 +133,21 @@ export default function CalificacionesPage() {
               </select>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" htmlFor="sel-comp-cal">Componente de Evaluación</label>
-              <select id="sel-comp-cal" className="form-select" value={selectedComponente} onChange={e => setSelectedComponente(e.target.value)}>
-                <option value="">— Selecciona componente —</option>
-                {componentes.map(c => <option key={c.id} value={c.id}>Peso {c.peso_relativo}% — {c.estado}</option>)}
+              <label className="form-label" htmlFor="sel-eval-cal">Evaluación Académica</label>
+              <select id="sel-eval-cal" className="form-select" value={selectedEvaluacion} onChange={e => setSelectedEvaluacion(e.target.value)}>
+                <option value="">— Selecciona evaluación —</option>
+                {evaluaciones.map(c => <option key={c.id} value={c.id}>Peso {c.peso_relativo}% — {c.estado}</option>)}
               </select>
             </div>
           </div>
         </div>
 
-        {/* Componentes de la sección */}
+        {/* Evaluaciones de la sección */}
         {selectedSeccion && (
           <div className="card mb-6">
-            <h3 style={{ marginBottom: 16 }}>Componentes de la Sección</h3>
-            {componentes.length === 0 ? (
-              <p className="text-muted text-sm">No hay componentes de evaluación configurados en esta sección.</p>
+            <h3 style={{ marginBottom: 16 }}>Evaluaciones de la Sección</h3>
+            {evaluaciones.length === 0 ? (
+              <p className="text-muted text-sm">No hay evaluaciones configuradas en esta sección.</p>
             ) : (
               <table className="data-table">
                 <thead>
@@ -161,7 +159,7 @@ export default function CalificacionesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {componentes.map(comp => (
+                  {evaluaciones.map(comp => (
                     <tr key={comp.id}>
                       <td className="cell-primary">{comp.peso_relativo}%</td>
                       <td>{comp.orden_presentacion || '—'}</td>
@@ -170,7 +168,7 @@ export default function CalificacionesPage() {
                         <div className="table-actions">
                           {comp.estado === 'BORRADOR' && (
                             <button
-                              id={`btn-publicar-comp-${comp.id}`}
+                              id={`btn-publicar-eval-${comp.id}`}
                               className="btn btn-primary btn-sm"
                               onClick={() => handlePublicar(comp.id)}
                             >
@@ -179,7 +177,7 @@ export default function CalificacionesPage() {
                           )}
                           {comp.estado === 'CERRADO' && (
                             <button
-                              id={`btn-corregir-comp-${comp.id}`}
+                              id={`btn-corregir-eval-${comp.id}`}
                               className="btn btn-secondary btn-sm"
                               onClick={() => { setSelectedCalif(comp.id); setShowCorrectModal(true) }}
                             >
@@ -197,16 +195,16 @@ export default function CalificacionesPage() {
         )}
 
         {/* Registro de calificaciones */}
-        {selectedSeccion && selectedComponente && (
+        {selectedSeccion && selectedEvaluacion && (
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h3>Registrar Calificaciones</h3>
-              {compObj && <Badge value={compObj.estado} dot />}
+              {evalObj && <Badge value={evalObj.estado} dot />}
             </div>
 
             <div className="alert alert-info mb-4">
               <span>Info:</span>
-              <span>Ingresa el ID de inscripción y la nota del alumno. Las notas se guardan en estado <strong>BORRADOR</strong> hasta publicar el componente.</span>
+              <span>Ingresa el ID de inscripción y la nota del alumno. Las notas se guardan en estado <strong>BORRADOR</strong> hasta publicar la evaluación.</span>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -256,7 +254,7 @@ export default function CalificacionesPage() {
                 id="btn-registrar-calificaciones"
                 className="btn btn-primary"
                 onClick={handleRegistrar}
-                disabled={saving || compObj?.estado === 'CERRADO'}
+                disabled={saving || evalObj?.estado === 'CERRADO'}
               >
                 {saving ? 'Registrando...' : 'Registrar Calificaciones'}
               </button>

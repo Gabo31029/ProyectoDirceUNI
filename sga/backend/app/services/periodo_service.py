@@ -182,7 +182,7 @@ class PeriodoService:
                     SELECT SUM(c.valor_nota * ce.peso_relativo / 100.00)
                     FROM inscripcion i
                     JOIN calificacion c ON c.id_inscripcion = i.id
-                    JOIN componente_evaluacion ce ON c.id_componente = ce.id
+                    JOIN evaluacion_academica ce ON c.id_evaluacion = ce.id_evaluacion
                     WHERE i.id_matricula IN (
                         SELECT id FROM matricula WHERE id_perfil_alumno = $1 AND id_periodo = $2
                     ) AND i.estado = 'ACTIVA'

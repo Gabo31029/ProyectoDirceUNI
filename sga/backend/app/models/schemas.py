@@ -3,7 +3,7 @@ from decimal import Decimal
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RolUsuario(str, Enum):
@@ -274,6 +274,22 @@ class PlanEstudiosResponse(BaseModel):
     updated_at: datetime
 
 
+class CursoEvaluacionConfigItem(BaseModel):
+    id_tipo_evaluacion: UUID
+    peso: Decimal = Field(gt=0)
+    orden: int = 1
+
+
+class CursoEvaluacionConfigResponse(BaseModel):
+    id: UUID
+    id_curso: UUID
+    id_tipo_evaluacion: UUID
+    peso: Decimal
+    orden: int
+    nombre_tipo_evaluacion: str | None = None
+    created_at: datetime
+
+
 class CursoCreate(BaseModel):
     codigo_curso: str = Field(min_length=2, max_length=20)
     nombre_curso: str = Field(min_length=2, max_length=200)
@@ -281,6 +297,17 @@ class CursoCreate(BaseModel):
     tipo_curso: str = Field(pattern=r"^(OBLIGATORIO|ELECTIVO)$")
     ciclo_sugerido: int | None = None
     prerrequisitos: list[UUID] = []
+    evaluaciones_config: list[CursoEvaluacionConfigItem] = []
+
+    @model_validator(mode="after")
+    def validar_pesos_suma_100(self) -> "CursoCreate":
+        if self.evaluaciones_config:
+            total = sum(item.peso for item in self.evaluaciones_config)
+            if abs(total - Decimal("100")) > Decimal("0.01"):
+                raise ValueError(
+                    f"Los pesos de las evaluaciones deben sumar exactamente 100%. Suma actual: {total}%"
+                )
+        return self
 
 
 class CursoResponse(BaseModel):
@@ -295,6 +322,7 @@ class CursoResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     prerrequisitos: list[UUID] = []
+    evaluaciones_config: list[CursoEvaluacionConfigResponse] = []
 
 
 
@@ -347,7 +375,7 @@ class SeccionResponse(BaseModel):
 
 class AsignacionDocenteCreate(BaseModel):
     id_usuario_docente: UUID
-    id_tipo_componente: UUID
+    id_tipo_evaluacion: UUID
     es_coordinador: bool = False
 
 
@@ -355,32 +383,32 @@ class AsignacionDocenteResponse(BaseModel):
     id: UUID
     id_seccion: UUID
     id_usuario_docente: UUID
-    id_tipo_componente: UUID
+    id_tipo_evaluacion: UUID
     es_coordinador: bool
     created_at: datetime
 
 
-class ComponenteEstado(str, Enum):
+class EvaluacionEstado(str, Enum):
     BORRADOR = "BORRADOR"
     PUBLICADO = "PUBLICADO"
     CERRADO = "CERRADO"
 
 
-class ComponenteEvaluacionCreate(BaseModel):
-    id_tipo_componente: UUID
+class EvaluacionAcademicaCreate(BaseModel):
+    id_tipo_evaluacion: UUID
     id_escala: UUID
     peso_relativo: Decimal = Field(gt=0, le=100)
     orden_presentacion: int | None = None
 
 
-class ComponenteEvaluacionResponse(BaseModel):
+class EvaluacionAcademicaResponse(BaseModel):
     id: UUID
     id_seccion: UUID
-    id_tipo_componente: UUID
+    id_tipo_evaluacion: UUID
     id_escala: UUID
     peso_relativo: Decimal
     orden_presentacion: int | None
-    estado: ComponenteEstado
+    estado: EvaluacionEstado
     created_at: datetime
     updated_at: datetime
 

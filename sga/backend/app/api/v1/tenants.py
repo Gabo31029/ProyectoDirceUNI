@@ -76,24 +76,24 @@ async def listar_escalas(
     return await _tenant_service().list_escalas(tenant_id)
 
 
-@router.post("/{tenant_id}/catalogos/tipos-componente", status_code=201)
-async def crear_tipo_componente(
+@router.post("/{tenant_id}/catalogos/tipos-evaluacion", status_code=201)
+async def crear_tipo_evaluacion(
     tenant_id: UUID,
     payload: TipoCatalogoCreate,
     current_user: CurrentUser = Depends(require_roles("ADMIN_CENTRAL")),
 ) -> dict:
-    return await _tenant_service().add_tipo_componente(
+    return await _tenant_service().add_tipo_evaluacion(
         tenant_id, payload, actor_id=current_user.id
     )
 
 
-@router.get("/{tenant_id}/catalogos/tipos-componente")
-async def listar_tipos_componente(
+@router.get("/{tenant_id}/catalogos/tipos-evaluacion")
+async def listar_tipos_evaluacion(
     tenant_id: UUID,
     current_user: CurrentUser = Depends(require_roles("ADMIN_CENTRAL", "ADMIN")),
 ) -> list[dict]:
     resolve_tenant_id(current_user, tenant_id)
-    return await _tenant_service().list_tipos_componente(tenant_id)
+    return await _tenant_service().list_tipos_evaluacion(tenant_id)
 
 
 @router.post("/{tenant_id}/catalogos/tipos-condicion", status_code=201)

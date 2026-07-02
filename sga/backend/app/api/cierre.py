@@ -17,7 +17,7 @@ def api_cerrar_acta(
 
     Seguridad y transaccionalidad:
     - Restringido a Docente Coordinador de la sección o Administrador.
-    - Cierra en cascada los componentes y calcula la nota final promedio de las inscripciones.
+    - Cierra en cascada las evaluaciones y calcula la nota final promedio de las inscripciones.
     - Manejo transaccional: Llama a `db.commit()` tras confirmar el éxito de la operación.
     """
     inscriptions = cerrar_acta_seccion(db, id_seccion, user)

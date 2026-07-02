@@ -6,10 +6,10 @@ import asyncpg
 class OfertaAcademicaInterface:
     """
     Contrato para el modulo de Oferta Academica (Ramos Jacay).
-    RF-USR-04 consulta componentes activos al desactivar un docente.
+    RF-USR-04 consulta evaluaciones activas al desactivar un docente.
     """
 
-    async def obtener_componentes_activos_docente(
+    async def obtener_evaluaciones_activas_docente(
         self,
         conn: asyncpg.Connection,
         *,
@@ -24,7 +24,7 @@ class OfertaAcademicaInterface:
 class OfertaAcademicaStub(OfertaAcademicaInterface):
     """Stub temporal hasta que Oferta Academica este disponible."""
 
-    async def obtener_componentes_activos_docente(
+    async def obtener_evaluaciones_activas_docente(
         self,
         conn: asyncpg.Connection,
         *,

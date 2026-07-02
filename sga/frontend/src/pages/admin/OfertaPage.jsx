@@ -9,6 +9,19 @@ import { periodoService } from '../../services/periodoService'
 
 const TABS = ['Planes de Estudio', 'Cursos', 'Secciones']
 
+// Helper: leer tenant_id del localStorage
+function getTenantId() {
+  try {
+    const stored = localStorage.getItem('sga_auth')
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      // AuthContext guarda el campo como 'tenantId' (camelCase)
+      return parsed.tenantId || parsed.tenant_id || null
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
 export default function OfertaPage() {
   const [activeTab, setActiveTab] = useState(0)
   const [planes, setPlanes] = useState([])
@@ -24,7 +37,7 @@ export default function OfertaPage() {
   const [form, setForm] = useState({})
   const [saving, setSaving] = useState(false)
 
-  // Estados añadidos para Malla Curricular y Prerrequisitos
+  // Estados para Malla Curricular y Prerrequisitos
   const [selectedPlanForMalla, setSelectedPlanForMalla] = useState(null)
   const [cursosPlan, setCursosPlan] = useState([])
   const [showAsociarModal, setShowAsociarModal] = useState(false)
@@ -32,12 +45,19 @@ export default function OfertaPage() {
   const [asociarForm, setAsociarForm] = useState({ id_curso: '', es_obligatorio: true })
   const [selectedPrereqs, setSelectedPrereqs] = useState([])
 
+  // Estado para la configuración de evaluaciones del curso
+  const [tiposEvaluacion, setTiposEvaluacion] = useState([])
+  const [evalConfig, setEvalConfig] = useState({}) // { [id_tipo_evaluacion]: { checked, peso } }
+
+  const sumaPesos = Object.values(evalConfig)
+    .filter(v => v.checked)
+    .reduce((acc, v) => acc + (parseFloat(v.peso) || 0), 0)
+
   const load = async () => {
     setLoading(true)
     try {
       if (activeTab === 0) {
         setPlanes(await ofertaService.listarPlanes())
-        // Recargar el plan seleccionado si ya estamos en la vista de malla
         if (selectedPlanForMalla) {
           const cp = await ofertaService.listarCursosPlan(selectedPlanForMalla.id)
           setCursosPlan(cp)
@@ -61,11 +81,59 @@ export default function OfertaPage() {
 
   useEffect(() => { load() }, [activeTab, selectedPeriodo])
 
-  const openModal = (type) => {
+  // Cargar tipos de evaluación cuando se va a abrir el modal de curso
+  const loadTiposEvaluacion = async () => {
+    const tenantId = getTenantId()
+    if (!tenantId) {
+      setError('No se pudo obtener el ID del tenant. Por favor recarga la página.')
+      return
+    }
+    try {
+      const tipos = await ofertaService.listarTiposEvaluacion(tenantId)
+      setTiposEvaluacion(tipos)
+      const init = {}
+      tipos.forEach(t => { init[t.id] = { checked: false, peso: '' } })
+      setEvalConfig(init)
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Error al cargar tipos de evaluación. Verifica que el catálogo esté configurado.')
+      setTiposEvaluacion([])
+    }
+  }
+
+  const openModal = async (type) => {
     setModalType(type)
     setForm({})
     setSelectedPrereqs([])
+    setEvalConfig({})
     setShowModal(true)
+    if (type === 'curso') {
+      await loadTiposEvaluacion()
+    }
+  }
+
+  const toggleEvalCheck = (id) => {
+    setEvalConfig(prev => ({
+      ...prev,
+      [id]: { ...prev[id], checked: !prev[id].checked, peso: prev[id].checked ? '' : prev[id].peso }
+    }))
+  }
+
+  const setEvalPeso = (id, value) => {
+    setEvalConfig(prev => ({
+      ...prev,
+      [id]: { ...prev[id], peso: value }
+    }))
+  }
+
+  const distribuirEquitativamente = () => {
+    const seleccionados = Object.entries(evalConfig).filter(([, v]) => v.checked)
+    if (seleccionados.length === 0) return
+    const pesoIgual = (100 / seleccionados.length).toFixed(2)
+    setEvalConfig(prev => {
+      const next = { ...prev }
+      seleccionados.forEach(([id]) => { next[id] = { ...next[id], peso: pesoIgual } })
+      return next
+    })
   }
 
   const handleSave = async (e) => {
@@ -77,7 +145,29 @@ export default function OfertaPage() {
         await ofertaService.crearPlan(form)
         setSuccess('Plan de estudios creado')
       } else if (modalType === 'curso') {
-        await ofertaService.crearCurso({ ...form, prerrequisitos: selectedPrereqs })
+        const evaluaciones_config = Object.entries(evalConfig)
+          .filter(([, v]) => v.checked && v.peso)
+          .map(([id, v], idx) => ({
+            id_tipo_evaluacion: id,
+            peso: parseFloat(v.peso),
+            orden: idx + 1,
+          }))
+
+        // Validar suma = 100 en el frontend antes de enviar
+        if (evaluaciones_config.length > 0) {
+          const total = evaluaciones_config.reduce((s, i) => s + i.peso, 0)
+          if (Math.abs(total - 100) > 0.01) {
+            setError(`Los pesos deben sumar 100%. Suma actual: ${total.toFixed(2)}%`)
+            setSaving(false)
+            return
+          }
+        }
+
+        await ofertaService.crearCurso({
+          ...form,
+          prerrequisitos: selectedPrereqs,
+          evaluaciones_config,
+        })
         setSuccess('Curso creado')
       } else if (modalType === 'seccion') {
         await ofertaService.crearSeccion({ ...form, id_periodo: selectedPeriodo })
@@ -96,7 +186,6 @@ export default function OfertaPage() {
     try {
       await ofertaService.activarPlan(planId)
       setSuccess('Plan activado')
-      // Actualizar el plan localmente en caso de que esté abierto en la vista de malla
       if (selectedPlanForMalla && selectedPlanForMalla.id === planId) {
         setSelectedPlanForMalla(prev => ({ ...prev, estado: 'ACTIVO' }))
       }
@@ -107,7 +196,7 @@ export default function OfertaPage() {
   }
 
   const handlePrereqChange = (cursoId) => {
-    setSelectedPrereqs(prev => 
+    setSelectedPrereqs(prev =>
       prev.includes(cursoId) ? prev.filter(id => id !== cursoId) : [...prev, cursoId]
     )
   }
@@ -167,6 +256,15 @@ export default function OfertaPage() {
     { accessor: 'creditos', header: 'Créditos' },
     { key: 'tipo', header: 'Tipo', render: r => <Badge value={r.tipo_curso} /> },
     { accessor: 'ciclo_sugerido', header: 'Ciclo' },
+    {
+      key: 'evaluaciones',
+      header: 'Evaluaciones',
+      render: r => r.evaluaciones_config && r.evaluaciones_config.length > 0
+        ? <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {r.evaluaciones_config.map(e => `${e.nombre_tipo_evaluacion || '?'} (${e.peso}%)`).join(' · ')}
+          </span>
+        : <span style={{ fontSize: '0.75rem', color: '#a0aec0', fontStyle: 'italic' }}>Sin config.</span>
+    },
   ]
 
   const seccionesColumns = [
@@ -175,6 +273,11 @@ export default function OfertaPage() {
     { accessor: 'vacantes_maximas', header: 'Vacantes Máx.' },
     { accessor: 'vacantes_disponibles', header: 'Disponibles' },
   ]
+
+  const sumColor = sumaPesos === 0 ? '#a0aec0'
+    : Math.abs(sumaPesos - 100) < 0.01 ? '#38a169'
+    : sumaPesos > 100 ? '#e53e3e'
+    : '#d69e2e'
 
   return (
     <Layout>
@@ -224,7 +327,7 @@ export default function OfertaPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderBottom: '1px solid var(--border-color, #e2e8f0)', paddingBottom: 16 }}>
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    Malla Curricular: {selectedPlanForMalla.carrera} 
+                    Malla Curricular: {selectedPlanForMalla.carrera}
                     <span style={{ fontSize: '1rem', color: 'var(--text-muted, #718096)' }}>({selectedPlanForMalla.version_plan})</span>
                     <Badge value={selectedPlanForMalla.estado} dot />
                   </h2>
@@ -232,26 +335,25 @@ export default function OfertaPage() {
                     ID Plan: {selectedPlanForMalla.id} | Créditos Totales: {selectedPlanForMalla.creditos_totales}
                   </p>
                 </div>
-                <button 
+                <button
                   id="btn-volver-planes"
-                  className="btn btn-secondary" 
+                  className="btn btn-secondary"
                   onClick={() => setSelectedPlanForMalla(null)}
                 >
                   Volver a Planes
                 </button>
               </div>
 
-              {/* Grid de 10 Ciclos */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
                 {Array.from({ length: 10 }, (_, i) => i + 1).map(ciclo => {
                   const cursosCiclo = cursosPlan.filter(c => c.ciclo_en_plan === ciclo)
                   return (
-                    <div 
-                      key={ciclo} 
-                      className="card" 
-                      style={{ 
-                        padding: 16, 
-                        border: '1px solid var(--border-color, #e2e8f0)', 
+                    <div
+                      key={ciclo}
+                      className="card"
+                      style={{
+                        padding: 16,
+                        border: '1px solid var(--border-color, #e2e8f0)',
                         background: 'var(--bg-card, #f8fafc)',
                         display: 'flex',
                         flexDirection: 'column',
@@ -274,20 +376,19 @@ export default function OfertaPage() {
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
                             {cursosCiclo.map(c => {
-                              // Buscar nombres de los prerrequisitos en la lista general de cursos
                               const prereqNames = (c.prerrequisitos || [])
                                 .map(pId => cursos.find(cur => cur.id === pId)?.codigo_curso)
                                 .filter(Boolean)
                                 .join(', ')
 
                               return (
-                                <div 
-                                  key={c.id} 
+                                <div
+                                  key={c.id}
                                   className="malla-curso-item"
-                                  style={{ 
-                                    padding: 10, 
-                                    borderRadius: 6, 
-                                    background: 'var(--bg-body, #ffffff)', 
+                                  style={{
+                                    padding: 10,
+                                    borderRadius: 6,
+                                    background: 'var(--bg-body, #ffffff)',
                                     border: '1px solid var(--border-color, #edf2f7)',
                                     position: 'relative',
                                     boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
@@ -317,10 +418,10 @@ export default function OfertaPage() {
                                   <button
                                     id={`btn-quitar-curso-${c.id}`}
                                     className="btn btn-danger btn-sm"
-                                    style={{ 
-                                      position: 'absolute', 
-                                      right: 8, 
-                                      top: 8, 
+                                    style={{
+                                      position: 'absolute',
+                                      right: 8,
+                                      top: 8,
                                       padding: '2px 6px',
                                       fontSize: '0.75rem',
                                       border: 'none',
@@ -477,15 +578,149 @@ export default function OfertaPage() {
                   </div>
                 </div>
 
+                {/* ── Evaluaciones y Pesos ── */}
+                <div className="form-group">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <label className="form-label" style={{ margin: 0 }}>
+                      Evaluaciones y Pesos
+                      <span style={{ fontWeight: 400, fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: 6 }}>
+                        (deben sumar exactamente 100%)
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ fontSize: '0.75rem', padding: '3px 10px' }}
+                      onClick={distribuirEquitativamente}
+                    >
+                      Distribuir equitativamente
+                    </button>
+                  </div>
+
+                  <div
+                    id="curso-eval-config-list"
+                    style={{
+                      border: '1px solid var(--border-color, #e2e8f0)',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {tiposEvaluacion.length === 0 ? (
+                      <p style={{ padding: '12px 16px', margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        No hay tipos de evaluación configurados en el catálogo.
+                      </p>
+                    ) : (
+                      tiposEvaluacion.map((tipo, idx) => {
+                        const cfg = evalConfig[tipo.id] || { checked: false, peso: '' }
+                        return (
+                          <div
+                            key={tipo.id}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 12,
+                              padding: '10px 14px',
+                              background: cfg.checked ? 'rgba(99,102,241,0.06)' : 'transparent',
+                              borderBottom: idx < tiposEvaluacion.length - 1 ? '1px solid var(--border-color, #edf2f7)' : 'none',
+                              transition: 'background 0.15s',
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              id={`eval-check-${tipo.id}`}
+                              checked={cfg.checked}
+                              onChange={() => toggleEvalCheck(tipo.id)}
+                              style={{ width: 16, height: 16, cursor: 'pointer', accentColor: 'var(--primary, #6366f1)' }}
+                            />
+                            <label
+                              htmlFor={`eval-check-${tipo.id}`}
+                              style={{
+                                flex: 1,
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                fontWeight: cfg.checked ? 600 : 400,
+                                color: cfg.checked ? 'var(--text-color)' : 'var(--text-muted)',
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              {tipo.nombre}
+                              {tipo.codigo && (
+                                <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                  ({tipo.codigo})
+                                </span>
+                              )}
+                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <input
+                                type="number"
+                                id={`eval-peso-${tipo.id}`}
+                                disabled={!cfg.checked}
+                                value={cfg.peso}
+                                onChange={e => setEvalPeso(tipo.id, e.target.value)}
+                                min="0.01"
+                                max="100"
+                                step="0.01"
+                                placeholder="0"
+                                style={{
+                                  width: 70,
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  border: '1px solid var(--border-color, #e2e8f0)',
+                                  fontSize: '0.875rem',
+                                  textAlign: 'right',
+                                  background: cfg.checked ? 'white' : '#f7fafc',
+                                  color: cfg.checked ? 'inherit' : '#a0aec0',
+                                  outline: 'none',
+                                }}
+                              />
+                              <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)', width: 16 }}>%</span>
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+
+                    {/* Indicador de suma */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '8px 14px',
+                      background: 'var(--bg-body, #f8fafc)',
+                      borderTop: '1px solid var(--border-color, #e2e8f0)',
+                    }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Total:</span>
+                      <span style={{
+                        fontWeight: 700,
+                        fontSize: '0.95rem',
+                        color: sumColor,
+                        transition: 'color 0.2s',
+                      }}>
+                        {sumaPesos.toFixed(2)}%
+                      </span>
+                      {Math.abs(sumaPesos - 100) < 0.01 && sumaPesos > 0 && (
+                        <span style={{ fontSize: '0.75rem', color: '#38a169' }}>✓ Correcto</span>
+                      )}
+                      {sumaPesos > 100 && (
+                        <span style={{ fontSize: '0.75rem', color: '#e53e3e' }}>⚠ Excede 100%</span>
+                      )}
+                      {sumaPesos > 0 && sumaPesos < 100 && (
+                        <span style={{ fontSize: '0.75rem', color: '#d69e2e' }}>Faltan {(100 - sumaPesos).toFixed(2)}%</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Prerrequisitos (Selección Múltiple)</label>
-                  <div 
+                  <div
                     id="curso-prerrequisitos-list"
-                    style={{ 
-                      maxHeight: '140px', 
-                      overflowY: 'auto', 
-                      border: '1px solid var(--border-color, #e2e8f0)', 
-                      padding: '10px', 
+                    style={{
+                      maxHeight: '140px',
+                      overflowY: 'auto',
+                      border: '1px solid var(--border-color, #e2e8f0)',
+                      padding: '10px',
                       borderRadius: '6px',
                       background: 'var(--bg-body, #ffffff)',
                       display: 'flex',
@@ -500,8 +735,8 @@ export default function OfertaPage() {
                     ) : (
                       cursos.map(c => (
                         <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.875rem' }}>
-                          <input 
-                            type="checkbox" 
+                          <input
+                            type="checkbox"
                             checked={selectedPrereqs.includes(c.id)}
                             onChange={() => handlePrereqChange(c.id)}
                           />
@@ -552,10 +787,10 @@ export default function OfertaPage() {
           >
             <div className="form-group">
               <label className="form-label" htmlFor="asociar-curso-select">Seleccionar Curso</label>
-              <select 
-                id="asociar-curso-select" 
-                className="form-select" 
-                value={asociarForm.id_curso} 
+              <select
+                id="asociar-curso-select"
+                className="form-select"
+                value={asociarForm.id_curso}
                 onChange={e => setAsociarForm({ ...asociarForm, id_curso: e.target.value })}
               >
                 <option value="">Selecciona un curso del catálogo...</option>
@@ -571,10 +806,10 @@ export default function OfertaPage() {
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="asociar-tipo-select">Condición del Curso en este Plan</label>
-              <select 
-                id="asociar-tipo-select" 
-                className="form-select" 
-                value={asociarForm.es_obligatorio ? 'true' : 'false'} 
+              <select
+                id="asociar-tipo-select"
+                className="form-select"
+                value={asociarForm.es_obligatorio ? 'true' : 'false'}
                 onChange={e => setAsociarForm({ ...asociarForm, es_obligatorio: e.target.value === 'true' })}
               >
                 <option value="true">Obligatorio</option>

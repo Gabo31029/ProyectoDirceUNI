@@ -7,7 +7,7 @@ from decimal import Decimal
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError, UnauthorizedError, ForbiddenError
 from app.models.schemas import (
     LoginRequest, RolUsuario, PeriodoAcademicoCreate, PeriodoEstado,
-    PlanEstudiosCreate, CursoCreate, SeccionCreate, ComponenteEvaluacionCreate
+    PlanEstudiosCreate, CursoCreate, SeccionCreate, EvaluacionAcademicaCreate
 )
 from app.services.auth_service import AuthService
 from app.services.periodo_service import PeriodoService
@@ -465,17 +465,17 @@ async def test_oferta_crear_seccion_invalid_period_state(mock_pool) -> None:
         await service.crear_seccion(tenant_id, payload, actor_id=uuid4())
 
 @pytest.mark.asyncio
-async def test_oferta_crear_componente_evaluacion_success(mock_pool) -> None:
+async def test_oferta_crear_evaluacion_academica_success(mock_pool) -> None:
     service = OfertaService(mock_pool)
     service.repo = AsyncMock()
 
     tenant_id = uuid4()
     seccion_id = uuid4()
     escala_id = uuid4()
-    componente_id = uuid4()
+    evaluacion_id = uuid4()
 
-    payload = ComponenteEvaluacionCreate(
-        id_tipo_componente=uuid4(),
+    payload = EvaluacionAcademicaCreate(
+        id_tipo_evaluacion=uuid4(),
         id_escala=escala_id,
         peso_relativo=Decimal("30.00"),
         orden_presentacion=1
@@ -483,15 +483,15 @@ async def test_oferta_crear_componente_evaluacion_success(mock_pool) -> None:
 
     service.repo.get_seccion_by_id.return_value = {"id": seccion_id}
     service.repo.get_escala_by_id_and_tenant.return_value = {"id": escala_id}
-    # Existing components sum to 60.00
-    service.repo.list_componentes_by_seccion.return_value = [
+    # Existing evaluations sum to 60.00
+    service.repo.list_evaluaciones_by_seccion.return_value = [
         {"peso_relativo": Decimal("40.00")},
         {"peso_relativo": Decimal("20.00")}
     ]
-    service.repo.create_componente_evaluacion.return_value = {
-        "id": componente_id,
+    service.repo.create_evaluacion_academica.return_value = {
+        "id": evaluacion_id,
         "id_seccion": seccion_id,
-        "id_tipo_componente": payload.id_tipo_componente,
+        "id_tipo_evaluacion": payload.id_tipo_evaluacion,
         "id_escala": escala_id,
         "peso_relativo": Decimal("30.00"),
         "orden_presentacion": 1,
@@ -500,12 +500,12 @@ async def test_oferta_crear_componente_evaluacion_success(mock_pool) -> None:
         "updated_at": datetime.now(UTC)
     }
 
-    res = await service.crear_componente_evaluacion(tenant_id, seccion_id, payload, actor_id=uuid4())
+    res = await service.crear_evaluacion_academica(tenant_id, seccion_id, payload, actor_id=uuid4())
 
     assert res.peso_relativo == Decimal("30.00")
 
 @pytest.mark.asyncio
-async def test_oferta_crear_componente_evaluacion_exceeds_weight(mock_pool) -> None:
+async def test_oferta_crear_evaluacion_academica_exceeds_weight(mock_pool) -> None:
     service = OfertaService(mock_pool)
     service.repo = AsyncMock()
 
@@ -513,8 +513,8 @@ async def test_oferta_crear_componente_evaluacion_exceeds_weight(mock_pool) -> N
     seccion_id = uuid4()
     escala_id = uuid4()
 
-    payload = ComponenteEvaluacionCreate(
-        id_tipo_componente=uuid4(),
+    payload = EvaluacionAcademicaCreate(
+        id_tipo_evaluacion=uuid4(),
         id_escala=escala_id,
         peso_relativo=Decimal("30.00"),
         orden_presentacion=1
@@ -522,11 +522,11 @@ async def test_oferta_crear_componente_evaluacion_exceeds_weight(mock_pool) -> N
 
     service.repo.get_seccion_by_id.return_value = {"id": seccion_id}
     service.repo.get_escala_by_id_and_tenant.return_value = {"id": escala_id}
-    # Existing components sum to 80.00 (80 + 30 = 110 > 100)
-    service.repo.list_componentes_by_seccion.return_value = [
+    # Existing evaluations sum to 80.00 (80 + 30 = 110 > 100)
+    service.repo.list_evaluaciones_by_seccion.return_value = [
         {"peso_relativo": Decimal("50.00")},
         {"peso_relativo": Decimal("30.00")}
     ]
 
     with pytest.raises(ValidationError, match="La suma de pesos supera el 100% permitido"):
-        await service.crear_componente_evaluacion(tenant_id, seccion_id, payload, actor_id=uuid4())
+        await service.crear_evaluacion_academica(tenant_id, seccion_id, payload, actor_id=uuid4())

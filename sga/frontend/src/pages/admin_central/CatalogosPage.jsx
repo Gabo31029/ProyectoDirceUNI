@@ -5,7 +5,8 @@ import DataTable from '../../components/DataTable'
 import ErrorAlert, { SuccessAlert } from '../../components/ErrorAlert'
 import { tenantService } from '../../services/tenantService'
 
-const TABS = ['Escalas', 'Tipos Componente', 'Tipos Condición', 'Tipos Evento']
+const TABS = ['Escalas', 'Tipos Evaluación', 'Tipos Condición', 'Tipos Evento']
+const ADD_LABELS = ['Nueva Escala', 'Nuevo Tipo de Evaluación', 'Nuevo Tipo de Condición', 'Nuevo Tipo de Evento']
 
 export default function CatalogosPage() {
   const [activeTab, setActiveTab] = useState(0)
@@ -38,7 +39,7 @@ export default function CatalogosPage() {
     try {
       let result = []
       if (activeTab === 0) result = await tenantService.listarEscalas(selectedTenant)
-      else if (activeTab === 1) result = await tenantService.listarTiposComponente(selectedTenant)
+      else if (activeTab === 1) result = await tenantService.listarTiposEvaluacion(selectedTenant)
       else if (activeTab === 2) result = await tenantService.listarTiposCondicion(selectedTenant)
       else if (activeTab === 3) result = await tenantService.listarTiposEvento(selectedTenant)
       setData(result)
@@ -61,7 +62,7 @@ export default function CatalogosPage() {
     setError('')
     try {
       if (activeTab === 0) await tenantService.crearEscala(selectedTenant, form)
-      else if (activeTab === 1) await tenantService.crearTipoComponente(selectedTenant, form)
+      else if (activeTab === 1) await tenantService.crearTipoEvaluacion(selectedTenant, form)
       else if (activeTab === 2) await tenantService.crearTipoCondicion(selectedTenant, form)
       else if (activeTab === 3) await tenantService.crearTipoEvento(selectedTenant, form)
       setSuccess('Ítem creado correctamente')
@@ -166,7 +167,7 @@ export default function CatalogosPage() {
         <div className="page-header">
           <div>
             <h1 className="page-title">Catálogos Institucionales</h1>
-            <p className="page-subtitle">Escalas, tipos de componente, condición y evento</p>
+            <p className="page-subtitle">Escalas, tipos de evaluación, condición y evento</p>
           </div>
           <div className="form-group" style={{ margin: 0 }}>
             <select
@@ -203,7 +204,7 @@ export default function CatalogosPage() {
           data={data}
           loading={loading}
           onAdd={selectedTenant ? openCreate : undefined}
-          addLabel={`Nuevo ${TABS[activeTab].slice(0, -1)}`}
+          addLabel={ADD_LABELS[activeTab]}
         />
 
         {showModal && (

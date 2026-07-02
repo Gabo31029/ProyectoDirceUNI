@@ -219,7 +219,7 @@ class TestDatabaseModels:
         expected_tables = {
             "tenants", "usuario", "perfil_alumno", "perfil_docente",
             "periodo_academico", "curso", "seccion", "inscripcion", "matricula",
-            "componente_evaluacion", "calificacion", "correccion_nota",
+            "evaluacion_academica", "calificacion", "correccion_nota",
             "snapshot_promedio", "condicion_academica_alumno",
             "politica_condicion_academica", "formula_promedio",
             "cuenta_seguimiento_alumno", "evento_academico", "registro_auditoria",

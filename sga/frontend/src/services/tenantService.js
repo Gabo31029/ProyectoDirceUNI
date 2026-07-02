@@ -10,8 +10,8 @@ export const tenantService = {
   listarEscalas: (tenantId) => api.get(`/tenants/${tenantId}/catalogos/escalas-evaluacion`).then(r => r.data),
   crearEscala: (tenantId, data) => api.post(`/tenants/${tenantId}/catalogos/escalas-evaluacion`, data).then(r => r.data),
 
-  listarTiposComponente: (tenantId) => api.get(`/tenants/${tenantId}/catalogos/tipos-componente`).then(r => r.data),
-  crearTipoComponente: (tenantId, data) => api.post(`/tenants/${tenantId}/catalogos/tipos-componente`, data).then(r => r.data),
+  listarTiposEvaluacion: (tenantId) => api.get(`/tenants/${tenantId}/catalogos/tipos-evaluacion`).then(r => r.data),
+  crearTipoEvaluacion: (tenantId, data) => api.post(`/tenants/${tenantId}/catalogos/tipos-evaluacion`, data).then(r => r.data),
 
   listarTiposCondicion: (tenantId) => api.get(`/tenants/${tenantId}/catalogos/tipos-condicion`).then(r => r.data),
   crearTipoCondicion: (tenantId, data) => api.post(`/tenants/${tenantId}/catalogos/tipos-condicion`, data).then(r => r.data),

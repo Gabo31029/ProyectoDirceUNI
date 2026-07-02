@@ -179,9 +179,9 @@ async def test_oferta_academica_integration_flow(client: AsyncClient) -> None:
     else:
         escala_id = escalas[0]["id"]
 
-    # 2. Obtener o crear tipo de componente "PC"
+    # 2. Obtener o crear tipo de evaluacion "PC"
     res_tipos = await client.get(
-        f"/api/v1/tenants/{tenant_id}/catalogos/tipos-componente",
+        f"/api/v1/tenants/{tenant_id}/catalogos/tipos-evaluacion",
         headers=central_headers,
     )
     assert res_tipos.status_code == 200
@@ -189,7 +189,7 @@ async def test_oferta_academica_integration_flow(client: AsyncClient) -> None:
     pc_tipo = next((t for t in tipos if t["codigo"] == "PC"), None)
     if not pc_tipo:
         res_tipo_create = await client.post(
-            f"/api/v1/tenants/{tenant_id}/catalogos/tipos-componente",
+            f"/api/v1/tenants/{tenant_id}/catalogos/tipos-evaluacion",
             json={
                 "codigo": "PC",
                 "nombre": "Practica Calificada",
@@ -284,11 +284,11 @@ async def test_oferta_academica_integration_flow(client: AsyncClient) -> None:
     assert res_sec.status_code == 201
     seccion_id = res_sec.json()["id"]
 
-    # 9. Crear Componente de Evaluación (40%, OK)
+    # 9. Crear Evaluación Académica (40%, OK)
     res_comp1 = await client.post(
-        f"/api/v1/oferta/secciones/{seccion_id}/componentes",
+        f"/api/v1/oferta/secciones/{seccion_id}/evaluaciones",
         json={
-            "id_tipo_componente": tipo_comp_id,
+            "id_tipo_evaluacion": tipo_comp_id,
             "id_escala": escala_id,
             "peso_relativo": 40.0,
             "orden_presentacion": 1,
@@ -297,11 +297,11 @@ async def test_oferta_academica_integration_flow(client: AsyncClient) -> None:
     )
     assert res_comp1.status_code == 201
 
-    # 10. Crear Componente de Evaluación Excesivo (70%, Error 400)
+    # 10. Crear Evaluación Académica Excesiva (70%, Error 400)
     res_comp2 = await client.post(
-        f"/api/v1/oferta/secciones/{seccion_id}/componentes",
+        f"/api/v1/oferta/secciones/{seccion_id}/evaluaciones",
         json={
-            "id_tipo_componente": tipo_comp_id,
+            "id_tipo_evaluacion": tipo_comp_id,
             "id_escala": escala_id,
             "peso_relativo": 70.0,
             "orden_presentacion": 2,

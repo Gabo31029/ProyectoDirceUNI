@@ -25,7 +25,10 @@ export const ofertaService = {
   // Docentes en sección
   asignarDocente: (seccionId, data) => api.post(`/oferta/secciones/${seccionId}/docentes`, data).then(r => r.data),
 
-  // Componentes de evaluación
-  listarComponentes: (seccionId) => api.get(`/oferta/secciones/${seccionId}/componentes`).then(r => r.data),
-  crearComponente: (seccionId, data) => api.post(`/oferta/secciones/${seccionId}/componentes`, data).then(r => r.data),
+  // Evaluaciones académicas
+  listarEvaluaciones: (seccionId) => api.get(`/oferta/secciones/${seccionId}/evaluaciones`).then(r => r.data),
+  crearEvaluacion: (seccionId, data) => api.post(`/oferta/secciones/${seccionId}/evaluaciones`, data).then(r => r.data),
+
+  // Tipos de evaluación del tenant (para configurar pesos en cursos)
+  listarTiposEvaluacion: (tenantId) => api.get(`/tenants/${tenantId}/catalogos/tipos-evaluacion`).then(r => r.data),
 }

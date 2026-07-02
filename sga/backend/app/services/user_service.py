@@ -187,17 +187,17 @@ class UserService:
         advertencias: list[str] = []
         if user["rol"] == "DOCENTE":
             async with self.pool.acquire() as conn:
-                componentes = await self.oferta.obtener_componentes_activos_docente(
+                evaluaciones = await self.oferta.obtener_evaluaciones_activas_docente(
                     conn,
                     id_tenant=tenant_id,
                     docente_id=user_id,
                 )
-            if componentes:
+            if evaluaciones:
                 secciones = ", ".join(
-                    c.get("codigo_seccion", str(c.get("seccion_id", "?"))) for c in componentes
+                    c.get("codigo_seccion", str(c.get("seccion_id", "?"))) for c in evaluaciones
                 )
                 advertencias.append(
-                    f"El docente tiene componentes activos en las secciones: {secciones}."
+                    f"El docente tiene evaluaciones activas en las secciones: {secciones}."
                 )
                 if not confirmar:
                     raise ValidationError(

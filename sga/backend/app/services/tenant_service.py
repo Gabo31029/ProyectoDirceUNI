@@ -198,17 +198,17 @@ class TenantService:
         rows = await self.repo.list_escalas(tenant_id)
         return [dict(row) for row in rows]
 
-    async def add_tipo_componente(
+    async def add_tipo_evaluacion(
         self, tenant_id: UUID, payload: TipoCatalogoCreate, *, actor_id: UUID
     ) -> dict:
-        row = await self.repo.create_tipo_componente(
+        row = await self.repo.create_tipo_evaluacion(
             tenant_id, codigo=payload.codigo, nombre=payload.nombre
         )
-        await self._audit_catalogo(tenant_id, actor_id, "TIPO_COMPONENTE_CREADO", row["id"])
+        await self._audit_catalogo(tenant_id, actor_id, "TIPO_EVALUACION_CREADO", row["id"])
         return dict(row)
 
-    async def list_tipos_componente(self, tenant_id: UUID) -> list[dict]:
-        return [dict(r) for r in await self.repo.list_tipos_componente(tenant_id)]
+    async def list_tipos_evaluacion(self, tenant_id: UUID) -> list[dict]:
+        return [dict(r) for r in await self.repo.list_tipos_evaluacion(tenant_id)]
 
     async def add_tipo_condicion(
         self, tenant_id: UUID, payload: TipoCatalogoCreate, *, actor_id: UUID

@@ -7,12 +7,12 @@ from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser
 from app.core.audit import log_audit, create_academic_event
-from app.repositories.calificacion import ComponenteRepository, CalificacionRepository
+from app.repositories.calificacion import EvaluacionRepository, CalificacionRepository
 from app.models.core_schemas import (
     Seccion, Inscripcion, EscalaEvaluacion, AsignacionDocenteSeccion,
     PeriodoAcademico, Matricula, PerfilAlumno
 )
-from app.models.calificacion import ComponenteEvaluacion
+from app.models.calificacion import EvaluacionAcademica
 from app.models.cierre import (
     FormulaPromedio, SnapshotPromedio, CondicionAcademicaAlumno,
     PoliticaCondicionAcademica
@@ -21,7 +21,7 @@ from app.models.seguimiento import CuentaSeguimientoAlumno
 from app.models.core_schemas import TipoCondicionAcademica as CoreTipoCondicion
 from app.domain.cierre import calcular_nota_final, calcular_promedio_ponderado, evaluar_politica_condicion
 
-componente_repo = ComponenteRepository()
+evaluacion_repo = EvaluacionRepository()
 calificacion_repo = CalificacionRepository()
 
 
@@ -76,24 +76,24 @@ def cerrar_acta_seccion(
                 detail="Solo el docente coordinador de la sección puede cerrar el acta."
             )
 
-    # 3. Recuperar componentes de evaluación de la sección
-    componentes = componente_repo.get_by_seccion(db, id_seccion)
-    if not componentes:
+    # 3. Recuperar evaluaciones académicas de la sección
+    evaluaciones = evaluacion_repo.get_by_seccion(db, id_seccion)
+    if not evaluaciones:
         log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_ACTA", "seccion",
-                  id_seccion, "RECHAZADA", motivo_rechazo="No hay componentes de evaluación configurados.")
+                  id_seccion, "RECHAZADA", motivo_rechazo="No hay evaluaciones configuradas.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No hay componentes de evaluación configurados en esta sección."
+            detail="No hay evaluaciones configuradas en esta sección."
         )
 
-    # 4. Asegurar que todas las actas/componentes parciales estén publicados
-    for c in componentes:
-        if c.estado != "PUBLICADO":
+    # 4. Asegurar que todas las actas/evaluaciones parciales estén publicadas
+    for ev in evaluaciones:
+        if ev.estado != "PUBLICADO":
             log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_ACTA", "seccion",
-                      id_seccion, "RECHAZADA", motivo_rechazo=f"Componente {c.id_componente} no está publicado.")
+                      id_seccion, "RECHAZADA", motivo_rechazo=f"Evaluación {ev.id_evaluacion} no está publicada.")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Todos los componentes de evaluación deben estar publicados antes de cerrar el acta."
+                detail="Todas las evaluaciones deben estar publicadas antes de cerrar el acta."
             )
 
     # 5. Obtener inscripciones de alumnos en la sección
@@ -104,24 +104,24 @@ def cerrar_acta_seccion(
 
     # Si no hay inscripciones activas, se realiza un cierre rápido de las actas vacías
     if not inscriptions:
-        for c in componentes:
-            c.estado = "CERRADO"
-            db.add(c)
+        for ev in evaluaciones:
+            ev.estado = "CERRADO"
+            db.add(ev)
         db.flush()
         log_audit(db, user.id_tenant, user.id_usuario, "CERRAR_ACTA", "seccion",
                   id_seccion, "EXITOSA", valor_nuevo={"inscriptions_count": 0})
         return []
 
-    # Recuperar escala de notas del primer componente (se asume homogénea para la sección)
-    id_escala = componentes[0].id_escala
+    # Recuperar escala de notas de la primera evaluación (se asume homogénea para la sección)
+    id_escala = evaluaciones[0].id_escala
     escala = db.query(EscalaEvaluacion).filter(EscalaEvaluacion.id_escala == id_escala).first()
 
     try:
         # 6. Calcular notas finales individuales y generar eventos académicos
         for ins in inscriptions:
             grades_list = []
-            for comp in componentes:
-                cal = calificacion_repo.get_by_inscripcion_and_componente(db, ins.id_inscripcion, comp.id_componente)
+            for ev in evaluaciones:
+                cal = calificacion_repo.get_by_inscripcion_and_evaluacion(db, ins.id_inscripcion, ev.id_evaluacion)
                 if not cal:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
@@ -130,10 +130,10 @@ def cerrar_acta_seccion(
                 # Formato esperado por el dominio de cálculos
                 grades_list.append({
                     "valor_nota": cal.valor_nota,
-                    "peso_relativo": comp.peso_relativo
+                    "peso_relativo": ev.peso_relativo
                 })
 
-            # Calcular el promedio de componentes
+            # Calcular el promedio de evaluaciones
             nota_final = calcular_nota_final(grades_list)
             ins.nota_final = nota_final
 
@@ -191,10 +191,10 @@ def cerrar_acta_seccion(
             ins.fecha_cambio_estado = datetime.now(timezone.utc)
             db.add(ins)
 
-        # 7. Asentar estado CERRADO en todos los componentes
-        for c in componentes:
-            c.estado = "CERRADO"
-            db.add(c)
+        # 7. Asentar estado CERRADO en todas las evaluaciones
+        for ev in evaluaciones:
+            ev.estado = "CERRADO"
+            db.add(ev)
 
         db.flush()
 
@@ -278,15 +278,15 @@ def cerrar_periodo_academico(
     # 3. Control de actas: Validar que todas las secciones estén cerradas
     sections = db.query(Seccion).filter(Seccion.id_periodo == id_periodo).all()
     for s in sections:
-        components = db.query(ComponenteEvaluacion).filter(
-            ComponenteEvaluacion.id_seccion == s.id_seccion
+        evaluaciones = db.query(EvaluacionAcademica).filter(
+            EvaluacionAcademica.id_seccion == s.id_seccion
         ).all()
-        for c in components:
-            if c.estado != "CERRADO":
+        for ev in evaluaciones:
+            if ev.estado != "CERRADO":
                 log_audit(
                     db, user.id_tenant, user.id_usuario, "CERRAR_PERIODO", "periodo_academico",
                     id_periodo, "RECHAZADA",
-                    motivo_rechazo=f"Sección {s.codigo_seccion} tiene componente abierto."
+                    motivo_rechazo=f"Sección {s.codigo_seccion} tiene evaluación abierta."
                 )
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -311,17 +311,10 @@ def cerrar_periodo_academico(
         .all()
     )
 
-    # Recuperar fórmulas del período
-    formula_pps = db.query(FormulaPromedio).filter(
-        FormulaPromedio.id_periodo == id_periodo, FormulaPromedio.tipo_promedio == "PPS"
-    ).first()
-    formula_ppa = db.query(FormulaPromedio).filter(
-        FormulaPromedio.id_periodo == id_periodo, FormulaPromedio.tipo_promedio == "PPA"
-    ).first()
-
-    regla_pps = formula_pps.regla_inclusion if formula_pps else "TODOS"
-    regla_ppa = formula_ppa.regla_inclusion if formula_ppa else "TODOS"
-    id_formula_aplicada = formula_pps.id_formula if formula_pps else None
+    # Promedios calculados universalmente como promedio ponderado simple
+    regla_pps = "TODOS"
+    regla_ppa = "TODOS"
+    id_formula_aplicada = None
 
     # Obtener las políticas activas de condiciones académicas configuradas para el período
     politicas = db.query(PoliticaCondicionAcademica).filter(

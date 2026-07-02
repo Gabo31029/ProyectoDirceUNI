@@ -3,14 +3,15 @@ from decimal import Decimal
 import asyncpg
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
-from app.domain.oferta import validar_prerrequisitos, validar_suma_pesos_componentes, validar_edicion_seccion
+from app.domain.oferta import validar_prerrequisitos, validar_suma_pesos_evaluaciones, validar_edicion_seccion
 from app.models.schemas import (
     PlanEstudiosCreate, PlanEstudiosResponse, PlanEstado,
     CursoCreate, CursoResponse, CursoAsociarPlan,
+    CursoEvaluacionConfigResponse,
     PrerrequisitoCreate, PrerrequisitoResponse,
     SeccionCreate, SeccionResponse, SeccionEstado,
     AsignacionDocenteCreate, AsignacionDocenteResponse,
-    ComponenteEvaluacionCreate, ComponenteEvaluacionResponse, ComponenteEstado
+    EvaluacionAcademicaCreate, EvaluacionAcademicaResponse, EvaluacionEstado
 )
 from app.repositories.audit_repository import AuditRepository
 from app.repositories.oferta_repository import OfertaRepository
@@ -60,11 +61,11 @@ def _map_seccion(row: asyncpg.Record) -> SeccionResponse:
     )
 
 
-def _map_componente(row: asyncpg.Record) -> ComponenteEvaluacionResponse:
-    return ComponenteEvaluacionResponse(
+def _map_evaluacion(row: asyncpg.Record) -> EvaluacionAcademicaResponse:
+    return EvaluacionAcademicaResponse(
         id=row["id"],
         id_seccion=row["id_seccion"],
-        id_tipo_componente=row["id_tipo_componente"],
+        id_tipo_evaluacion=row["id_tipo_evaluacion"],
         id_escala=row["id_escala"],
         peso_relativo=row["peso_relativo"],
         orden_presentacion=row["orden_presentacion"],
@@ -181,6 +182,29 @@ class OfertaService:
                         prereq_id,
                     )
 
+                # Insertar configuración de evaluaciones si viene en el payload
+                eval_config_rows = []
+                for idx, item in enumerate(payload.evaluaciones_config):
+                    # Verificar que el tipo de evaluación pertenece al tenant
+                    tipo_exists = await conn.fetchval(
+                        "SELECT EXISTS(SELECT 1 FROM tipo_evaluacion WHERE id_tipo_evaluacion = $1 AND id_tenant = $2)",
+                        item.id_tipo_evaluacion,
+                        tenant_id,
+                    )
+                    if not tipo_exists:
+                        raise NotFoundError(
+                            f"Tipo de evaluación con ID {item.id_tipo_evaluacion} no encontrado en este tenant."
+                        )
+                    orden = item.orden if item.orden else (idx + 1)
+                    cfg_row = await self.repo.create_curso_evaluacion_config(
+                        conn,
+                        id_curso=row["id"],
+                        id_tipo_evaluacion=item.id_tipo_evaluacion,
+                        peso=item.peso,
+                        orden=orden,
+                    )
+                    eval_config_rows.append(cfg_row)
+
                 await self.audit_repo.registrar(
                     conn,
                     id_tenant=tenant_id,
@@ -193,6 +217,18 @@ class OfertaService:
 
         res = _map_curso(row)
         res.prerrequisitos = payload.prerrequisitos
+        res.evaluaciones_config = [
+            CursoEvaluacionConfigResponse(
+                id=cfg["id"],
+                id_curso=cfg["id_curso"],
+                id_tipo_evaluacion=cfg["id_tipo_evaluacion"],
+                peso=cfg["peso"],
+                orden=cfg["orden"],
+                nombre_tipo_evaluacion=None,
+                created_at=cfg["created_at"],
+            )
+            for cfg in eval_config_rows
+        ]
         return res
 
     async def asociar_curso_a_plan(
@@ -277,6 +313,18 @@ class OfertaService:
                 """,
                 tenant_id,
             )
+            # Consultar configuraciones de evaluaciones para todos los cursos del tenant
+            eval_configs = await conn.fetch(
+                """
+                SELECT cec.*, te.nombre AS nombre_tipo_evaluacion
+                FROM curso_evaluacion_config cec
+                JOIN curso c ON cec.id_curso = c.id
+                LEFT JOIN tipo_evaluacion te ON cec.id_tipo_evaluacion = te.id_tipo_evaluacion
+                WHERE c.id_tenant = $1
+                ORDER BY cec.id_curso, cec.orden, cec.created_at
+                """,
+                tenant_id,
+            )
             
         prereq_map = {}
         for r in prereqs:
@@ -285,11 +333,29 @@ class OfertaService:
             if c_id not in prereq_map:
                 prereq_map[c_id] = []
             prereq_map[c_id].append(req_id)
-            
+
+        eval_config_map = {}
+        for r in eval_configs:
+            c_id = r["id_curso"]
+            if c_id not in eval_config_map:
+                eval_config_map[c_id] = []
+            eval_config_map[c_id].append(
+                CursoEvaluacionConfigResponse(
+                    id=r["id"],
+                    id_curso=r["id_curso"],
+                    id_tipo_evaluacion=r["id_tipo_evaluacion"],
+                    peso=r["peso"],
+                    orden=r["orden"],
+                    nombre_tipo_evaluacion=r["nombre_tipo_evaluacion"],
+                    created_at=r["created_at"],
+                )
+            )
+
         cursos_res = []
         for row in rows:
             curso_dto = _map_curso(row)
             curso_dto.prerrequisitos = prereq_map.get(curso_dto.id, [])
+            curso_dto.evaluaciones_config = eval_config_map.get(curso_dto.id, [])
             cursos_res.append(curso_dto)
             
         return cursos_res
@@ -402,24 +468,48 @@ class OfertaService:
         ):
             raise ConflictError("Ya existe una seccion con ese codigo para este curso en el periodo.")
 
-        row = await self.repo.create_seccion(
-            id_tenant=tenant_id,
-            id_periodo=payload.id_periodo,
-            id_curso=payload.id_curso,
-            codigo_seccion=payload.codigo_seccion,
-            vacantes_maximas=payload.vacantes_maximas,
-        )
-
         async with self.pool.acquire() as conn:
-            await self.audit_repo.registrar(
-                conn,
-                id_tenant=tenant_id,
-                id_usuario=actor_id,
-                tipo_operacion="SECCION_CREADA",
-                entidad_afectada="seccion",
-                id_entidad=row["id"],
-                valor_nuevo=dict(row),
-            )
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO seccion (id_tenant, id_periodo, id_curso, codigo_seccion, vacantes_maximas, vacantes_disponibles)
+                    VALUES ($1, $2, $3, $4, $5, $5)
+                    RETURNING *
+                    """,
+                    tenant_id,
+                    payload.id_periodo,
+                    payload.id_curso,
+                    payload.codigo_seccion,
+                    payload.vacantes_maximas,
+                )
+
+                # Propagar evaluaciones del curso a la sección si hay configuración definida
+                eval_configs = await conn.fetch(
+                    "SELECT COUNT(*) AS cnt FROM curso_evaluacion_config WHERE id_curso = $1",
+                    payload.id_curso,
+                )
+                config_count = eval_configs[0]["cnt"] if eval_configs else 0
+
+                if config_count > 0:
+                    # Obtener escala default del tenant
+                    escala = await self.repo.get_escala_default_by_tenant(tenant_id)
+                    if escala:
+                        await self.repo.propagar_evaluaciones_config_a_seccion(
+                            conn,
+                            id_seccion=row["id"],
+                            id_curso=payload.id_curso,
+                            id_escala_default=escala["id"],
+                        )
+
+                await self.audit_repo.registrar(
+                    conn,
+                    id_tenant=tenant_id,
+                    id_usuario=actor_id,
+                    tipo_operacion="SECCION_CREADA",
+                    entidad_afectada="seccion",
+                    id_entidad=row["id"],
+                    valor_nuevo=dict(row),
+                )
 
         return _map_seccion(row)
 
@@ -447,11 +537,11 @@ class OfertaService:
             existing = await conn.fetchrow(
                 """
                 SELECT 1 FROM asignacion_docente_seccion
-                WHERE id_seccion = $1 AND id_usuario_docente = $2 AND id_tipo_componente = $3
+                WHERE id_seccion = $1 AND id_usuario_docente = $2 AND id_tipo_evaluacion = $3
                 """,
                 seccion_id,
                 payload.id_usuario_docente,
-                payload.id_tipo_componente,
+                payload.id_tipo_evaluacion,
             )
             if existing:
                 raise ConflictError("El docente ya esta asignado a este componente de la seccion.")
@@ -459,7 +549,7 @@ class OfertaService:
         row = await self.repo.create_asignacion_docente(
             id_seccion=seccion_id,
             id_usuario_docente=payload.id_usuario_docente,
-            id_tipo_componente=payload.id_tipo_componente,
+            id_tipo_evaluacion=payload.id_tipo_evaluacion,
             es_coordinador=payload.es_coordinador,
         )
 
@@ -467,15 +557,15 @@ class OfertaService:
             id=row["id"],
             id_seccion=row["id_seccion"],
             id_usuario_docente=row["id_usuario_docente"],
-            id_tipo_componente=row["id_tipo_componente"],
+            id_tipo_evaluacion=row["id_tipo_evaluacion"],
             es_coordinador=row["es_coordinador"],
             created_at=row["created_at"],
         )
 
-    # --- Componentes de Evaluacion ---
-    async def crear_componente_evaluacion(
-        self, tenant_id: UUID, seccion_id: UUID, payload: ComponenteEvaluacionCreate, *, actor_id: UUID
-    ) -> ComponenteEvaluacionResponse:
+    # --- Evaluaciones Académicas ---
+    async def crear_evaluacion_academica(
+        self, tenant_id: UUID, seccion_id: UUID, payload: EvaluacionAcademicaCreate, *, actor_id: UUID
+    ) -> EvaluacionAcademicaResponse:
         seccion = await self.repo.get_seccion_by_id(seccion_id, tenant_id)
         if seccion is None:
             raise NotFoundError("Seccion no encontrada.")
@@ -485,26 +575,26 @@ class OfertaService:
             raise NotFoundError("La escala de evaluacion no existe o no pertenece al tenant.")
 
         # Validar suma de pesos <= 100
-        existentes = await self.repo.list_componentes_by_seccion(seccion_id)
+        existentes = await self.repo.list_evaluaciones_by_seccion(seccion_id)
         pesos_list = [Decimal(str(c["peso_relativo"])) for c in existentes]
         try:
-            validar_suma_pesos_componentes(pesos_list, payload.peso_relativo)
+            validar_suma_pesos_evaluaciones(pesos_list, payload.peso_relativo)
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
 
-        row = await self.repo.create_componente_evaluacion(
+        row = await self.repo.create_evaluacion_academica(
             id_seccion=seccion_id,
-            id_tipo_componente=payload.id_tipo_componente,
+            id_tipo_evaluacion=payload.id_tipo_evaluacion,
             id_escala=payload.id_escala,
             peso_relative=payload.peso_relativo,
             orden_presentacion=payload.orden_presentacion,
         )
 
-        return _map_componente(row)
+        return _map_evaluacion(row)
 
-    async def list_componentes(self, tenant_id: UUID, seccion_id: UUID) -> list[ComponenteEvaluacionResponse]:
+    async def list_evaluaciones(self, tenant_id: UUID, seccion_id: UUID) -> list[EvaluacionAcademicaResponse]:
         seccion = await self.repo.get_seccion_by_id(seccion_id, tenant_id)
         if seccion is None:
             raise NotFoundError("Seccion no encontrada.")
-        rows = await self.repo.list_componentes_by_seccion(seccion_id)
-        return [_map_componente(r) for r in rows]
+        rows = await self.repo.list_evaluaciones_by_seccion(seccion_id)
+        return [_map_evaluacion(r) for r in rows]

@@ -37,10 +37,10 @@ class EscalaEvaluacion(Base):
         CheckConstraint("nota_minima < nota_aprobatoria AND nota_aprobatoria <= nota_maxima", name="chk_escala_notas"),
     )
 
-class TipoComponente(Base):
-    __tablename__ = "tipo_componente"
+class TipoEvaluacion(Base):
+    __tablename__ = "tipo_evaluacion"
     
-    id_tipo_componente = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id_tipo_evaluacion = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     id_tenant = Column(String(36), ForeignKey("tenants.id_tenant", ondelete="RESTRICT"), nullable=False)
     codigo = Column(String(20), nullable=False)
     nombre = Column(String(100), nullable=False)
@@ -48,7 +48,7 @@ class TipoComponente(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (
-        UniqueConstraint("id_tenant", "codigo", name="uq_tipo_componente_codigo"),
+        UniqueConstraint("id_tenant", "codigo", name="uq_tipo_evaluacion_codigo"),
     )
 
 class TipoCondicionAcademica(Base):
@@ -234,16 +234,16 @@ class AsignacionDocenteSeccion(Base):
     id_asignacion = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     id_seccion = Column(String(36), ForeignKey("seccion.id_seccion", ondelete="RESTRICT"), nullable=False)
     id_perfil_docente = Column(String(36), ForeignKey("perfil_docente.id_perfil_docente", ondelete="RESTRICT"), nullable=False)
-    id_tipo_componente = Column(String(36), ForeignKey("tipo_componente.id_tipo_componente", ondelete="RESTRICT"), nullable=False)
+    id_tipo_evaluacion = Column(String(36), ForeignKey("tipo_evaluacion.id_tipo_evaluacion", ondelete="RESTRICT"), nullable=False)
     es_coordinador = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     seccion = relationship("Seccion", backref="asignaciones_docente")
     perfil_docente = relationship("PerfilDocente", backref="asignaciones_seccion")
-    tipo_componente = relationship("TipoComponente", backref="asignaciones_docente")
+    tipo_evaluacion = relationship("TipoEvaluacion", backref="asignaciones_docente")
     
     __table_args__ = (
-        UniqueConstraint("id_seccion", "id_perfil_docente", "id_tipo_componente", name="uq_asignacion_docente"),
+        UniqueConstraint("id_seccion", "id_perfil_docente", "id_tipo_evaluacion", name="uq_asignacion_docente"),
     )
 
 class Matricula(Base):

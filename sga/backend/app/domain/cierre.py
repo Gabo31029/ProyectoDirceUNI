@@ -18,15 +18,15 @@ def redondear_nota(val: Decimal) -> Decimal:
 
 def calcular_nota_final(calificaciones: List[Dict[str, Any]]) -> Decimal:
     """
-    Calcula la nota final de una asignatura ponderando las notas obtenidas en cada componente.
+    Calcula la nota final de una asignatura ponderando las notas obtenidas en cada evaluación.
 
     Parámetros:
     - calificaciones: Lista de diccionarios, donde cada uno debe contener:
-        * 'valor_nota': Calificación obtenida en el componente (Decimal).
-        * 'peso_relativo': Peso relativo o porcentaje del componente (Decimal).
+        * 'valor_nota': Calificación obtenida en la evaluación (Decimal).
+        * 'peso_relativo': Peso relativo o porcentaje de la evaluación (Decimal).
 
     Reglas de negocio:
-    - La suma de los pesos de todos los componentes debe ser exactamente igual a 100.00%.
+    - La suma de los pesos de todas las evaluaciones debe ser exactamente igual a 100.00%.
     - Aplica la fórmula: Sumatoria(Nota_i * (Peso_i / 100)).
     - El resultado final se redondea a dos decimales.
     """
@@ -35,7 +35,7 @@ def calcular_nota_final(calificaciones: List[Dict[str, Any]]) -> Decimal:
         
     total_peso = sum(Decimal(str(c["peso_relativo"])) for c in calificaciones)
     if total_peso != Decimal("100.00"):
-        raise CierreDomainError(f"La suma de pesos de los componentes debe ser exactamente 100, pero es {total_peso}.")
+        raise CierreDomainError(f"La suma de pesos de las evaluaciones debe ser exactamente 100, pero es {total_peso}.")
         
     nota_acumulada = sum(
         Decimal(str(c["valor_nota"])) * (Decimal(str(c["peso_relativo"])) / Decimal("100.00"))

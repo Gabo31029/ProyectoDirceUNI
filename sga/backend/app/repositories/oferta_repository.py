@@ -249,20 +249,20 @@ class OfertaRepository:
         *,
         id_seccion: UUID,
         id_usuario_docente: UUID,
-        id_tipo_componente: UUID,
+        id_tipo_evaluacion: UUID,
         es_coordinador: bool,
     ) -> asyncpg.Record:
         async with self.pool.acquire() as conn:
             return await conn.fetchrow(
                 """
                 INSERT INTO asignacion_docente_seccion (
-                    id_seccion, id_usuario_docente, id_tipo_componente, es_coordinador
+                    id_seccion, id_usuario_docente, id_tipo_evaluacion, es_coordinador
                 ) VALUES ($1, $2, $3, $4)
                 RETURNING *
                 """,
                 id_seccion,
                 id_usuario_docente,
-                id_tipo_componente,
+                id_tipo_evaluacion,
                 es_coordinador,
             )
 
@@ -274,12 +274,12 @@ class OfertaRepository:
                 tenant_id,
             )
 
-    # --- Componentes Evaluacion ---
-    async def create_componente_evaluacion(
+    # --- Evaluaciones Académicas ---
+    async def create_evaluacion_academica(
         self,
         *,
         id_seccion: UUID,
-        id_tipo_componente: UUID,
+        id_tipo_evaluacion: UUID,
         id_escala: UUID,
         peso_relative: Decimal,
         orden_presentacion: int | None,
@@ -287,13 +287,13 @@ class OfertaRepository:
         async with self.pool.acquire() as conn:
             return await conn.fetchrow(
                 """
-                INSERT INTO componente_evaluacion (
-                    id_seccion, id_tipo_componente, id_escala, peso_relativo, orden_presentacion, estado
+                INSERT INTO evaluacion_academica (
+                    id_seccion, id_tipo_evaluacion, id_escala, peso_relativo, orden_presentacion, estado
                 ) VALUES ($1, $2, $3, $4, $5, 'BORRADOR')
                 RETURNING *
                 """,
                 id_seccion,
-                id_tipo_componente,
+                id_tipo_evaluacion,
                 id_escala,
                 peso_relative,
                 orden_presentacion,
@@ -307,10 +307,10 @@ class OfertaRepository:
                 tenant_id,
             )
 
-    async def list_componentes_by_seccion(self, id_seccion: UUID) -> list[asyncpg.Record]:
+    async def list_evaluaciones_by_seccion(self, id_seccion: UUID) -> list[asyncpg.Record]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM componente_evaluacion WHERE id_seccion = $1 ORDER BY orden_presentacion, created_at",
+                "SELECT * FROM evaluacion_academica WHERE id_seccion = $1 ORDER BY orden_presentacion, created_at",
                 id_seccion,
             )
             return list(rows)
@@ -329,3 +329,83 @@ class OfertaRepository:
             )
             return result != "DELETE 0"
 
+    # --- Configuración de Evaluaciones del Curso ---
+    async def create_curso_evaluacion_config(
+        self,
+        conn,
+        *,
+        id_curso: UUID,
+        id_tipo_evaluacion: UUID,
+        peso: Decimal,
+        orden: int,
+    ) -> asyncpg.Record:
+        return await conn.fetchrow(
+            """
+            INSERT INTO curso_evaluacion_config (id_curso, id_tipo_evaluacion, peso, orden)
+            VALUES ($1, $2, $3, $4)
+            RETURNING *
+            """,
+            id_curso,
+            id_tipo_evaluacion,
+            peso,
+            orden,
+        )
+
+    async def list_evaluaciones_config_by_curso(self, id_curso: UUID) -> list[asyncpg.Record]:
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT cec.*, te.nombre AS nombre_tipo_evaluacion
+                FROM curso_evaluacion_config cec
+                LEFT JOIN tipo_evaluacion te ON cec.id_tipo_evaluacion = te.id_tipo_evaluacion
+                WHERE cec.id_curso = $1
+                ORDER BY cec.orden, cec.created_at
+                """,
+                id_curso,
+            )
+            return list(rows)
+
+    async def propagar_evaluaciones_config_a_seccion(
+        self,
+        conn,
+        *,
+        id_seccion: UUID,
+        id_curso: UUID,
+        id_escala_default: UUID,
+    ) -> int:
+        """Inserta en evaluacion_academica los registros de curso_evaluacion_config para la sección.
+        Retorna la cantidad de evaluaciones propagadas."""
+        rows = await conn.fetch(
+            """
+            SELECT id_tipo_evaluacion, peso, orden
+            FROM curso_evaluacion_config
+            WHERE id_curso = $1
+            ORDER BY orden, created_at
+            """,
+            id_curso,
+        )
+        count = 0
+        for row in rows:
+            await conn.execute(
+                """
+                INSERT INTO evaluacion_academica
+                    (id_seccion, id_tipo_evaluacion, id_escala, peso_relativo, orden_presentacion, estado)
+                VALUES ($1, $2, $3, $4, $5, 'BORRADOR')
+                ON CONFLICT DO NOTHING
+                """,
+                id_seccion,
+                row["id_tipo_evaluacion"],
+                id_escala_default,
+                row["peso"],
+                row["orden"],
+            )
+            count += 1
+        return count
+
+    async def get_escala_default_by_tenant(self, tenant_id: UUID) -> asyncpg.Record | None:
+        """Obtiene la primera escala de evaluación disponible del tenant."""
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow(
+                "SELECT * FROM cat_escala_evaluacion WHERE id_tenant = $1 ORDER BY created_at LIMIT 1",
+                tenant_id,
+            )

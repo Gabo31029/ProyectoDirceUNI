@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from decimal import Decimal
 from app.core.db import get_db
 from app.core.security import CurrentUser, get_current_user
-from app.services.calificacion import registrar_calificaciones, publicar_componente, corregir_calificacion
+from app.services.calificacion import registrar_calificaciones, publicar_evaluacion, corregir_calificacion
 
 router = APIRouter(prefix="/calificaciones", tags=["Calificaciones"])
 
@@ -30,16 +30,16 @@ class CorreccionRequest(BaseModel):
     valor_nuevo: float = Field(..., ge=0.0, description="Nueva calificación corregida")
     justificacion: str = Field(..., min_length=5, max_length=1000, description="Justificación de la corrección")
 
-@router.post("/secciones/{id_seccion}/componentes/{id_componente}", status_code=status.HTTP_201_CREATED)
+@router.post("/secciones/{id_seccion}/evaluaciones/{id_evaluacion}", status_code=status.HTTP_201_CREATED)
 def api_registrar_calificaciones(
     id_seccion: str,
-    id_componente: str,
+    id_evaluacion: str,
     payload: RegistroCalificacionesRequest,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Endpoint para ingresar o actualizar calificaciones de estudiantes para un componente en borrador.
+    Endpoint para ingresar o actualizar calificaciones de estudiantes para una evaluación en borrador.
 
     Seguridad y control:
     - Restringido a Docente asignado a la sección o Administrador.
@@ -47,28 +47,28 @@ def api_registrar_calificaciones(
       se realiza el `db.commit()` para persistir el lote de calificaciones.
     """
     calificaciones_in = [{"id_inscripcion": c.id_inscripcion, "valor_nota": Decimal(str(c.valor_nota))} for c in payload.calificaciones]
-    res = registrar_calificaciones(db, id_seccion, id_componente, calificaciones_in, user)
+    res = registrar_calificaciones(db, id_seccion, id_evaluacion, calificaciones_in, user)
     db.commit()
     return {"message": "Calificaciones registradas correctamente en borrador.", "count": len(res)}
 
-@router.put("/secciones/{id_seccion}/componentes/{id_componente}/publicar")
-def api_publicar_componente(
+@router.put("/secciones/{id_seccion}/evaluaciones/{id_evaluacion}/publicar")
+def api_publicar_evaluacion(
     id_seccion: str,
-    id_componente: str,
+    id_evaluacion: str,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Endpoint para publicar de forma oficial las calificaciones de un componente de evaluación.
+    Endpoint para publicar de forma oficial las calificaciones de una evaluación.
 
     Seguridad y control:
     - Restringido a Docente Coordinador de la sección o Administrador.
     - Efecto colateral: Las calificaciones cambian a estado PUBLICADO y son visibles para el estudiante.
     - Manejo transaccional: Confirma los cambios mediante `db.commit()`.
     """
-    comp = publicar_componente(db, id_seccion, id_componente, user)
+    comp = publicar_evaluacion(db, id_seccion, id_evaluacion, user)
     db.commit()
-    return {"message": "Componente publicado correctamente.", "id_componente": comp.id_componente, "estado": comp.estado}
+    return {"message": "Evaluación publicada correctamente.", "id_evaluacion": comp.id_evaluacion, "estado": comp.estado}
 
 @router.post("/{id_calificacion}/corregir")
 def api_corregir_calificacion(
@@ -78,7 +78,7 @@ def api_corregir_calificacion(
     user: CurrentUser = Depends(get_current_user)
 ):
     """
-    Endpoint para realizar una corrección administrativa de nota sobre un componente cerrado.
+    Endpoint para realizar una corrección administrativa de nota sobre una evaluación cerrada.
 
     Seguridad y control:
     - Permitido de forma exclusiva para administradores.

@@ -15,8 +15,8 @@ from app.models.schemas import (
     SeccionResponse,
     AsignacionDocenteCreate,
     AsignacionDocenteResponse,
-    ComponenteEvaluacionCreate,
-    ComponenteEvaluacionResponse,
+    EvaluacionAcademicaCreate,
+    EvaluacionAcademicaResponse,
 )
 from app.services.oferta_service import OfertaService
 
@@ -149,23 +149,23 @@ async def asignar_docente_a_seccion(
     )
 
 
-# --- Componentes Evaluacion ---
-@router.post("/secciones/{seccion_id}/componentes", response_model=ComponenteEvaluacionResponse, status_code=201)
-async def crear_componente_evaluacion(
+# --- Evaluaciones Académicas ---
+@router.post("/secciones/{seccion_id}/evaluaciones", response_model=EvaluacionAcademicaResponse, status_code=201)
+async def crear_evaluacion_academica(
     seccion_id: UUID,
-    payload: ComponenteEvaluacionCreate,
+    payload: EvaluacionAcademicaCreate,
     current_user: CurrentUser = Depends(require_roles("ADMIN")),
-) -> ComponenteEvaluacionResponse:
+) -> EvaluacionAcademicaResponse:
     tenant_id = resolve_tenant_id(current_user)
-    return await _oferta_service().crear_componente_evaluacion(
+    return await _oferta_service().crear_evaluacion_academica(
         tenant_id, seccion_id, payload, actor_id=current_user.id
     )
 
 
-@router.get("/secciones/{seccion_id}/componentes", response_model=list[ComponenteEvaluacionResponse])
-async def listar_componentes_evaluacion(
+@router.get("/secciones/{seccion_id}/evaluaciones", response_model=list[EvaluacionAcademicaResponse])
+async def listar_evaluaciones_academica(
     seccion_id: UUID,
     current_user: CurrentUser = Depends(require_roles("ADMIN", "DOCENTE", "ALUMNO")),
-) -> list[ComponenteEvaluacionResponse]:
+) -> list[EvaluacionAcademicaResponse]:
     tenant_id = resolve_tenant_id(current_user)
-    return await _oferta_service().list_componentes(tenant_id, seccion_id)
+    return await _oferta_service().list_evaluaciones(tenant_id, seccion_id)

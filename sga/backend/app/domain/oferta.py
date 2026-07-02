@@ -22,7 +22,7 @@ def validar_prerrequisitos(
         raise ValueError(f"Tipo de prerrequisito desconocido: {tipo_prereq}")
 
 
-def validar_suma_pesos_componentes(pesos_existentes: list[Decimal], nuevo_peso: Decimal) -> None:
+def validar_suma_pesos_evaluaciones(pesos_existentes: list[Decimal], nuevo_peso: Decimal) -> None:
     suma = sum(pesos_existentes) + nuevo_peso
     if suma > Decimal("100.00"):
         raise ValueError(

@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 
 from app.domain.periodo import validar_fechas_periodo, validar_transicion_estado_periodo
-from app.domain.oferta import validar_prerrequisitos, validar_suma_pesos_componentes, validar_edicion_seccion
+from app.domain.oferta import validar_prerrequisitos, validar_suma_pesos_evaluaciones, validar_edicion_seccion
 from app.models.schemas import PeriodoEstado
 
 
@@ -64,17 +64,17 @@ def test_validar_prerrequisitos_creditos_invalido() -> None:
         validar_prerrequisitos("MINIMO_CREDITOS", None, None)
 
 
-def test_validar_suma_pesos_componentes_ok() -> None:
+def test_validar_suma_pesos_evaluaciones_ok() -> None:
     existentes = [Decimal("30.00"), Decimal("40.00")]
     # 30 + 40 + 30 = 100 (válido, no excede 100)
-    validar_suma_pesos_componentes(existentes, Decimal("30.00"))
+    validar_suma_pesos_evaluaciones(existentes, Decimal("30.00"))
 
 
-def test_validar_suma_pesos_componentes_excedido() -> None:
+def test_validar_suma_pesos_evaluaciones_excedido() -> None:
     existentes = [Decimal("30.00"), Decimal("40.00")]
     with pytest.raises(ValueError, match="La suma de pesos supera el 100% permitido"):
         # 30 + 40 + 31 = 101 (inválido)
-        validar_suma_pesos_componentes(existentes, Decimal("31.00"))
+        validar_suma_pesos_evaluaciones(existentes, Decimal("31.00"))
 
 
 def test_validar_edicion_seccion_ok() -> None:

@@ -97,24 +97,36 @@ class TenantRepository:
             )
             return list(rows)
 
-    async def create_tipo_componente(
+    async def create_tipo_evaluacion(
         self, tenant_id: UUID, *, codigo: str, nombre: str
     ) -> asyncpg.Record:
         async with self.pool.acquire() as conn:
-            return await conn.fetchrow(
-                """
-                INSERT INTO cat_tipo_componente (id_tenant, codigo, nombre)
-                VALUES ($1, $2, $3) RETURNING *
-                """,
-                tenant_id,
-                codigo,
-                nombre,
-            )
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO cat_tipo_evaluacion (id_tenant, codigo, nombre)
+                    VALUES ($1, $2, $3) RETURNING *
+                    """,
+                    tenant_id,
+                    codigo,
+                    nombre,
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO tipo_evaluacion (id_tipo_evaluacion, id_tenant, codigo, nombre)
+                    VALUES ($1, $2, $3, $4)
+                    """,
+                    row["id"],
+                    tenant_id,
+                    codigo,
+                    nombre,
+                )
+                return row
 
-    async def list_tipos_componente(self, tenant_id: UUID) -> list[asyncpg.Record]:
+    async def list_tipos_evaluacion(self, tenant_id: UUID) -> list[asyncpg.Record]:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM cat_tipo_componente WHERE id_tenant = $1 ORDER BY codigo",
+                "SELECT * FROM cat_tipo_evaluacion WHERE id_tenant = $1 ORDER BY codigo",
                 tenant_id,
             )
             return list(rows)

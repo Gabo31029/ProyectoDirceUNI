@@ -6,19 +6,19 @@ from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser
 from app.core.audit import log_audit, create_academic_event
-from app.repositories.calificacion import ComponenteRepository, CalificacionRepository, CorreccionNotaRepository
+from app.repositories.calificacion import EvaluacionRepository, CalificacionRepository, CorreccionNotaRepository
 from app.models.core_schemas import (
     Seccion, Inscripcion, EscalaEvaluacion, AsignacionDocenteSeccion,
     PeriodoAcademico, Matricula
 )
-from app.models.calificacion import Calificacion, ComponenteEvaluacion, CorreccionNota
+from app.models.calificacion import Calificacion, EvaluacionAcademica, CorreccionNota
 from app.models.cierre import FormulaPromedio, SnapshotPromedio
 from app.domain.calificacion import (
-    validate_grade_value, can_modify_grades, can_publish_component, can_correct_grade
+    validate_grade_value, can_modify_grades, can_publish_evaluation, can_correct_grade
 )
 from app.domain.cierre import calcular_nota_final, calcular_promedio_ponderado
 
-componente_repo = ComponenteRepository()
+evaluacion_repo = EvaluacionRepository()
 calificacion_repo = CalificacionRepository()
 correccion_repo = CorreccionNotaRepository()
 
@@ -26,18 +26,18 @@ correccion_repo = CorreccionNotaRepository()
 def registrar_calificaciones(
     db: Session,
     id_seccion: str,
-    id_componente: str,
+    id_evaluacion: str,
     calificaciones_in: List[Dict[str, Any]],
     user: CurrentUser
 ) -> List[Calificacion]:
     """
-    Caso de uso: Registra o actualiza calificaciones de estudiantes para un componente de evaluación.
+    Caso de uso: Registra o actualiza calificaciones de estudiantes para una evaluación.
 
     Reglas de negocio y seguridad:
     - Control de accesos (RBAC): Solo accesible por un Docente asignado a la sección o un Administrador.
     - Validación de asignación: Si el usuario es docente, se verifica que esté asignado a la sección
       (con bypass especial para perfiles de pruebas/desarrollo).
-    - Máquina de estados: El componente de evaluación debe estar en estado 'BORRADOR'.
+    - Máquina de estados: La evaluación debe estar en estado 'BORRADOR'.
     - Consistencia de datos: Las inscripciones de los alumnos deben pertenecer a la sección
       y no encontrarse en estado 'RETIRADA' o 'ANULADA'.
     - Rango de escala: Cada calificación se valida contra el rango de la escala de evaluación configurada.
@@ -64,29 +64,29 @@ def registrar_calificaciones(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="El docente no está asignado a esta sección.")
 
-    # 2. Recuperar y validar existencia del Componente de Evaluación
-    componente = componente_repo.get(db, id_componente)
-    if not componente or componente.id_seccion != id_seccion:
+    # 2. Recuperar y validar existencia de la Evaluación
+    evaluacion = evaluacion_repo.get(db, id_evaluacion)
+    if not evaluacion or evaluacion.id_seccion != id_seccion:
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                  "componente", id_componente, "RECHAZADA", motivo_rechazo="Componente no encontrado.")
+                  "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo="Evaluación no encontrada.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Componente de evaluación no encontrado.")
+                            detail="Evaluación no encontrada.")
 
     # 3. Verificación de estado de flujo del acta
-    if not can_modify_grades(componente.estado):
+    if not can_modify_grades(evaluacion.estado):
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                  "componente", id_componente, "RECHAZADA",
-                  motivo_rechazo="El componente no está en estado BORRADOR.")
+                  "evaluacion", id_evaluacion, "RECHAZADA",
+                  motivo_rechazo="La evaluación no está en estado BORRADOR.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="No se pueden modificar calificaciones en un componente publicado o cerrado.")
+                            detail="No se pueden modificar calificaciones en una evaluación publicada o cerrada.")
 
     # 4. Recuperar la escala de evaluación asociada para validar límites
     escala = db.query(EscalaEvaluacion).filter(
-        EscalaEvaluacion.id_escala == componente.id_escala
+        EscalaEvaluacion.id_escala == evaluacion.id_escala
     ).first()
     if not escala:
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                  "componente", id_componente, "RECHAZADA", motivo_rechazo="Escala de evaluación no configurada.")
+                  "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo="Escala de evaluación no configurada.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Escala de evaluación no encontrada.")
 
@@ -118,7 +118,7 @@ def registrar_calificaciones(
             validate_grade_value(nota_val, escala.nota_minima, escala.nota_maxima)
 
             # Guardar en base de datos: Crear o actualizar
-            calif = calificacion_repo.get_by_inscripcion_and_componente(db, insc_id, id_componente)
+            calif = calificacion_repo.get_by_inscripcion_and_evaluacion(db, insc_id, id_evaluacion)
             if calif:
                 calif.valor_nota = nota_val
                 calif.id_docente_ingreso = user.id_perfil or "mock-docente-id"
@@ -127,7 +127,7 @@ def registrar_calificaciones(
             else:
                 calif_data = {
                     "id_inscripcion": insc_id,
-                    "id_componente": id_componente,
+                    "id_evaluacion": id_evaluacion,
                     "valor_nota": nota_val,
                     "estado": "BORRADOR",
                     "id_docente_ingreso": user.id_perfil or "mock-docente-id"
@@ -139,7 +139,7 @@ def registrar_calificaciones(
         # Enviar cambios a la transacción de base de datos sin confirmarlos (commit en API router)
         db.flush()
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                  "componente", id_componente, "EXITOSA",
+                  "evaluacion", id_evaluacion, "EXITOSA",
                   valor_nuevo={"calificaciones_count": len(res_calificaciones)})
         return res_calificaciones
 
@@ -149,50 +149,50 @@ def registrar_calificaciones(
     except Exception as e:
         db.rollback()
         log_audit(db, user.id_tenant, user.id_usuario, "REGISTRAR_CALIFICACION",
-                  "componente", id_componente, "RECHAZADA", motivo_rechazo=str(e))
+                  "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo=str(e))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"Error interno al registrar calificaciones: {str(e)}")
 
 
-def publicar_componente(
+def publicar_evaluacion(
     db: Session,
     id_seccion: str,
-    id_componente: str,
+    id_evaluacion: str,
     user: CurrentUser
-) -> ComponenteEvaluacion:
+) -> EvaluacionAcademica:
     """
-    Caso de uso: Publica las calificaciones de un componente de evaluación.
+    Caso de uso: Publica las calificaciones de una evaluación.
 
     Reglas de negocio y flujo:
     - Hace las notas visibles para los alumnos del portal.
     - Control de accesos (RBAC): Requiere rol Administrador o ser el Docente Coordinador de la sección.
-    - Máquina de estados: Solo se permite publicar si el componente está actualmente en 'BORRADOR'.
-    - Cascada: Modifica el estado tanto del componente evaluado como de todas las calificaciones
-      individuales asociadas a él a 'PUBLICADO'.
-    - Registra un evento académico inmutable ('EVT-NOTA-COMPONENTE-PUBLICADA') en la bitácora institucional.
+    - Máquina de estados: Solo se permite publicar si la evaluación está actualmente en 'BORRADOR'.
+    - Cascada: Modifica el estado tanto de la evaluación evaluada como de todas las calificaciones
+      individuales asociadas a ella a 'PUBLICADO'.
+    - Registra un evento académico inmutable ('EVT-NOTA-EVALUACION-PUBLICADA') en la bitácora institucional.
     """
-    # 1. Recuperar Componente de Evaluación
-    componente = componente_repo.get(db, id_componente)
-    if not componente or componente.id_seccion != id_seccion:
+    # 1. Recuperar Evaluación
+    evaluacion = evaluacion_repo.get(db, id_evaluacion)
+    if not evaluacion or evaluacion.id_seccion != id_seccion:
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                  "componente", id_componente, "RECHAZADA", motivo_rechazo="Componente no encontrado.")
+                  "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo="Evaluación no encontrada.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Componente de evaluación no encontrado.")
+                            detail="Evaluación no encontrada.")
 
     # 2. Validar transición de estado
-    if not can_publish_component(componente.estado):
+    if not can_publish_evaluation(evaluacion.estado):
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                  "componente", id_componente, "RECHAZADA",
-                  motivo_rechazo="Componente no está en estado BORRADOR.")
+                  "evaluacion", id_evaluacion, "RECHAZADA",
+                  motivo_rechazo="La evaluación no está en estado BORRADOR.")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="El componente ya se encuentra publicado o cerrado.")
+                            detail="La evaluación ya se encuentra publicada o cerrada.")
 
     # 3. Control de Accesos
     if user.rol not in ("ADMINISTRADOR", "DOCENTE"):
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                  "componente", id_componente, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
+                  "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo="Rol no autorizado.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="No autorizado para publicar componentes.")
+                            detail="No autorizado para publicar evaluaciones.")
 
     # Validación adicional para docentes: Debe ser coordinador de la sección académica
     if user.rol == "DOCENTE":
@@ -204,17 +204,17 @@ def publicar_componente(
         ).first()
         if not is_coord and not docente_perfil_id.startswith("profile-docente-mock"):
             log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                      "componente", id_componente, "RECHAZADA",
+                      "evaluacion", id_evaluacion, "RECHAZADA",
                       motivo_rechazo="Docente no es coordinador.")
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="Solo el docente coordinador de la sección puede publicar calificaciones.")
 
     try:
         # 4. Transición de estados en cascada
-        componente.estado = "PUBLICADO"
-        db.add(componente)
+        evaluacion.estado = "PUBLICADO"
+        db.add(evaluacion)
 
-        grades = calificacion_repo.get_by_componente(db, id_componente)
+        grades = calificacion_repo.get_by_evaluacion(db, id_evaluacion)
         for g in grades:
             g.estado = "PUBLICADO"
             db.add(g)
@@ -223,18 +223,18 @@ def publicar_componente(
 
         # Emitir evento del Ciclo de Vida Académico
         create_academic_event(
-            db, user.id_tenant, "EVT-NOTA-COMPONENTE-PUBLICADA",
-            user.id_usuario, "componente_evaluacion", id_componente
+            db, user.id_tenant, "EVT-NOTA-EVALUACION-PUBLICADA",
+            user.id_usuario, "evaluacion_academica", id_evaluacion
         )
 
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                  "componente", id_componente, "EXITOSA")
-        return componente
+                  "evaluacion", id_evaluacion, "EXITOSA")
+        return evaluacion
 
     except Exception as e:
         db.rollback()
         log_audit(db, user.id_tenant, user.id_usuario, "PUBLICAR_COMPONENTE",
-                  "componente", id_componente, "RECHAZADA", motivo_rechazo=str(e))
+                  "evaluacion", id_evaluacion, "RECHAZADA", motivo_rechazo=str(e))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail=f"Error al publicar calificaciones: {str(e)}")
 
@@ -247,11 +247,11 @@ def corregir_calificacion(
     user: CurrentUser
 ) -> Calificacion:
     """
-    Caso de uso: Aplica una corrección administrativa de nota sobre un componente cerrado.
+    Caso de uso: Aplica una corrección administrativa de nota sobre una evaluación cerrada.
 
     Reglas de negocio complejas y auditoría:
     - Control de accesos (RBAC): Únicamente permitida para el rol ADMINISTRADOR.
-    - Máquina de estados: Solo aplica sobre rubros evaluativos que ya estén en estado 'CERRADO'.
+    - Máquina de estados: Solo aplica sobre evaluaciones que ya estén en estado 'CERRADO'.
     - Límite de escala: La nota nueva se valida con los límites superior e inferior de la escala.
     - Trazabilidad e inmutabilidad:
         1. Crea un evento académico 'EVT-NOTA-CORREGIDA' registrando los valores anterior y nuevo.
@@ -281,20 +281,20 @@ def corregir_calificacion(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Registro de calificación no encontrado.")
 
-    # 3. Validar estado del componente (Acta cerrada)
-    componente = componente_repo.get(db, calif.id_componente)
-    if not componente or not can_correct_grade(componente.estado):
+    # 3. Validar estado de la evaluación (Acta cerrada)
+    evaluacion = evaluacion_repo.get(db, calif.id_evaluacion)
+    if not evaluacion or not can_correct_grade(evaluacion.estado):
         log_audit(db, user.id_tenant, user.id_usuario, "CORREGIR_CALIFICACION",
                   "calificacion", id_calificacion, "RECHAZADA",
-                  motivo_rechazo="El componente no está cerrado.")
+                  motivo_rechazo="La evaluación no está cerrada.")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Las correcciones administrativas solo aplican sobre componentes cerrados."
+            detail="Las correcciones administrativas solo aplican sobre evaluaciones cerradas."
         )
 
     # 4. Validar nueva calificación contra los límites de la escala
     escala = db.query(EscalaEvaluacion).filter(
-        EscalaEvaluacion.id_escala == componente.id_escala
+        EscalaEvaluacion.id_escala == evaluacion.id_escala
     ).first()
     validate_grade_value(valor_nuevo, escala.nota_minima, escala.nota_maxima)
 
@@ -350,7 +350,7 @@ def corregir_calificacion(
         ).all()
         lista_calif_domain = []
         for c in todas_calif:
-            comp = componente_repo.get(db, c.id_componente)
+            comp = evaluacion_repo.get(db, c.id_evaluacion)
             lista_calif_domain.append({
                 "valor_nota": c.valor_nota,
                 "peso_relativo": comp.peso_relativo
@@ -381,18 +381,10 @@ def corregir_calificacion(
             PeriodoAcademico.id_periodo == matricula.id_periodo
         ).first()
         if periodo and periodo.estado == "CERRADO":
-            # Obtener las fórmulas parametrizadas del período para PPS y PPA
-            formula_pps = db.query(FormulaPromedio).filter(
-                FormulaPromedio.id_periodo == periodo.id_periodo,
-                FormulaPromedio.tipo_promedio == "PPS"
-            ).first()
-            formula_ppa = db.query(FormulaPromedio).filter(
-                FormulaPromedio.id_periodo == periodo.id_periodo,
-                FormulaPromedio.tipo_promedio == "PPA"
-            ).first()
-
-            regla_pps = formula_pps.regla_inclusion if formula_pps else "TODOS"
-            regla_ppa = formula_ppa.regla_inclusion if formula_ppa else "TODOS"
+            # Promedios calculados de forma universal como promedio ponderado simple
+            regla_pps = "TODOS"
+            regla_ppa = "TODOS"
+            formula_pps = None
 
             # Obtener inscripciones válidas para el período actual
             ins_periodo = (

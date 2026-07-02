@@ -87,7 +87,7 @@ export default function DashboardDocente() {
               <Icon name="clipboard" size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: '0.875rem' }}>Calificaciones</div>
-                <div className="caption">Registrar notas y publicar componentes</div>
+                <div className="caption">Registrar notas y publicar evaluaciones</div>
               </div>
               <Icon name="chevron-right" size={14} style={{ color: 'var(--ink-4)' }} />
             </button>

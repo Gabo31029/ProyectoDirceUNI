@@ -82,7 +82,7 @@ export default function DashboardAdminCentral() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
                 { icon: 'building', label: 'Gestionar Instituciones', sub: 'Crear y administrar tenants', to: '/admin-central/tenants' },
-                { icon: 'library', label: 'Catálogos globales', sub: 'Escalas, componentes y condiciones', to: '/admin-central/catalogos' },
+                { icon: 'library', label: 'Catálogos globales', sub: 'Escalas, evaluaciones y condiciones', to: '/admin-central/catalogos' },
               ].map(item => (
                 <button
                   key={item.to}

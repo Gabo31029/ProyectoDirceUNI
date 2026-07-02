@@ -9,7 +9,7 @@ import { tenantService } from '../../services/tenantService'
 import { useAuth } from '../../context/AuthContext'
 
 const ESTADOS = ['CONFIGURACION', 'MATRICULA', 'REGISTRO_NOTAS', 'CERRADO']
-const TABS_POLITICAS = ['Turnos de Matrícula', 'Condición', 'Retiro', 'Reserva', 'Fórmula', 'Dispersión']
+const TABS_POLITICAS = ['Turnos de Matrícula', 'Condición', 'Retiro', 'Reserva', 'Dispersión']
 
 const LABEL_MAP = {
   tipo_condicion: 'Condición Académica',
@@ -72,8 +72,7 @@ export default function PeriodosPage() {
         const r = await periodoService.obtenerPoliticaReserva(periodoId)
         result = r ? [r] : []
       }
-      else if (tab === 4) result = await periodoService.listarFormulas(periodoId)
-      else if (tab === 5) {
+      else if (tab === 4) {
         const r = await periodoService.obtenerDispersion(periodoId)
         result = r ? [r] : []
       }
@@ -143,8 +142,7 @@ export default function PeriodosPage() {
       else if (politicasTab === 1) await periodoService.crearPoliticaCondicion(id, polForm)
       else if (politicasTab === 2) await periodoService.crearPoliticaRetiro(id, polForm)
       else if (politicasTab === 3) await periodoService.crearPoliticaReserva(id, polForm)
-      else if (politicasTab === 4) await periodoService.crearFormula(id, polForm)
-      else if (politicasTab === 5) await periodoService.crearDispersion(id, polForm)
+      else if (politicasTab === 4) await periodoService.crearDispersion(id, polForm)
       setSuccess('Política agregada')
       setPolForm({})
       await loadPoliticas(id, politicasTab)
@@ -258,35 +256,6 @@ export default function PeriodosPage() {
       </div>
     )
     if (politicasTab === 4) return (
-      <div className="grid-2">
-        <div className="form-group">
-          <label className="form-label" htmlFor="pol-tipo-prom">Tipo de Promedio</label>
-          <select id="pol-tipo-prom" className="form-select" value={f.tipo_promedio || ''} onChange={e => set('tipo_promedio', e.target.value)}>
-            <option value="">Selecciona...</option>
-            <option value="PPS">PPS</option>
-            <option value="PPA">PPA</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="pol-regla">Regla de Inclusión</label>
-          <select id="pol-regla" className="form-select" value={f.regla_inclusion || ''} onChange={e => set('regla_inclusion', e.target.value)}>
-            <option value="">Selecciona...</option>
-            <option value="TODOS">TODOS</option>
-            <option value="ULTIMO">ULTIMO</option>
-            <option value="SOLO_APROBADOS">SOLO_APROBADOS</option>
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="pol-expr">Expresión de Cálculo</label>
-          <input id="pol-expr" className="form-input" value={f.expresion_calculo || ''} onChange={e => set('expresion_calculo', e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label className="form-label" htmlFor="pol-version">Versión</label>
-          <input id="pol-version" className="form-input" value={f.version_formula || ''} onChange={e => set('version_formula', e.target.value)} />
-        </div>
-      </div>
-    )
-    if (politicasTab === 5) return (
       <div className="grid-2">
         <div className="form-group">
           <label className="form-label" htmlFor="pol-ciclos">Ciclos Máx. Dispersión</label>

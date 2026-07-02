@@ -48,38 +48,38 @@ def validate_grade_value(
             f"por la escala ({n_min} - {n_max})."
         )
 
-def can_modify_grades(estado_componente: str) -> bool:
+def can_modify_grades(estado_evaluacion: str) -> bool:
     """
-    Determina si las calificaciones de un componente se pueden modificar.
+    Determina si las calificaciones de una evaluación se pueden modificar.
     
     Regla de negocio:
-    - Solo se permite el ingreso o modificación de calificaciones si el componente se encuentra en estado 'BORRADOR'.
+    - Solo se permite el ingreso o modificación de calificaciones si la evaluación se encuentra en estado 'BORRADOR'.
     """
-    return estado_componente == GradeSheetStatus.BORRADOR
+    return estado_evaluacion == GradeSheetStatus.BORRADOR
 
-def can_publish_component(estado_componente: str) -> bool:
+def can_publish_evaluation(estado_evaluacion: str) -> bool:
     """
-    Determina si es posible publicar las calificaciones de un componente.
+    Determina si es posible publicar las calificaciones de una evaluación.
     
     Regla de negocio:
     - Solo se permite realizar la transición a 'PUBLICADO' desde el estado inicial 'BORRADOR'.
     """
-    return estado_componente == GradeSheetStatus.BORRADOR
+    return estado_evaluacion == GradeSheetStatus.BORRADOR
 
-def can_close_component(estado_componente: str) -> bool:
+def can_close_evaluation(estado_evaluacion: str) -> bool:
     """
-    Determina si es posible cerrar de forma definitiva las calificaciones de un componente.
+    Determina si es posible cerrar de forma definitiva las calificaciones de una evaluación.
     
     Regla de negocio:
-    - Solo se permite cerrar el componente si se encuentra actualmente en estado 'PUBLICADO'.
+    - Solo se permite cerrar la evaluación si se encuentra actualmente en estado 'PUBLICADO'.
     """
-    return estado_componente == GradeSheetStatus.PUBLICADO
+    return estado_evaluacion == GradeSheetStatus.PUBLICADO
 
-def can_correct_grade(estado_componente: str) -> bool:
+def can_correct_grade(estado_evaluacion: str) -> bool:
     """
     Determina si una calificación es elegible para una corrección administrativa.
     
     Regla de negocio:
-    - Las correcciones administrativas son excepcionales y solo se aplican sobre componentes en estado 'CERRADO'.
+    - Las correcciones administrativas son excepcionales y solo se aplican sobre evaluaciones en estado 'CERRADO'.
     """
-    return estado_componente == GradeSheetStatus.CERRADO
+    return estado_evaluacion == GradeSheetStatus.CERRADO
