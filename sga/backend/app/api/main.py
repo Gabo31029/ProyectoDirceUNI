@@ -50,9 +50,9 @@ def startup_event() -> None:
     Base.metadata.create_all(bind=engine)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(calificaciones_router)
-app.include_router(cierre_router)
-app.include_router(historial_router)
+app.include_router(calificaciones_router, prefix="/api/v1")
+app.include_router(cierre_router, prefix="/api/v1")
+app.include_router(historial_router, prefix="/api/v1")
 app.include_router(api_router)
 
 # ── Health-check ──────────────────────────────────────────────────────────────
