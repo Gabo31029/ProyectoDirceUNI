@@ -416,6 +416,7 @@ class EvaluacionAcademicaResponse(BaseModel):
     peso_relativo: Decimal
     orden_presentacion: int | None
     estado: EvaluacionEstado
+    nombre_tipo_evaluacion: str | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -150,7 +150,11 @@ export default function CalificacionesPage() {
               <label className="form-label" htmlFor="sel-eval-cal">Evaluación Académica</label>
               <select id="sel-eval-cal" className="form-select" value={selectedEvaluacion} onChange={e => setSelectedEvaluacion(e.target.value)}>
                 <option value="">— Selecciona evaluación —</option>
-                {evaluaciones.map(c => <option key={c.id} value={c.id}>Peso {c.peso_relativo}% — {c.estado}</option>)}
+                {evaluaciones.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre_tipo_evaluacion ? `${c.nombre_tipo_evaluacion} (Peso ${c.peso_relativo}% — ${c.estado})` : `Peso ${c.peso_relativo}% — ${c.estado}`}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -166,6 +170,7 @@ export default function CalificacionesPage() {
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th>Tipo de Evaluación</th>
                     <th>Peso Relativo</th>
                     <th>Orden</th>
                     <th>Estado</th>
@@ -175,7 +180,8 @@ export default function CalificacionesPage() {
                 <tbody>
                   {evaluaciones.map(comp => (
                     <tr key={comp.id}>
-                      <td className="cell-primary">{comp.peso_relativo}%</td>
+                      <td className="cell-primary">{comp.nombre_tipo_evaluacion || '—'}</td>
+                      <td>{comp.peso_relativo}%</td>
                       <td>{comp.orden_presentacion || '—'}</td>
                       <td><Badge value={comp.estado} dot /></td>
                       <td>

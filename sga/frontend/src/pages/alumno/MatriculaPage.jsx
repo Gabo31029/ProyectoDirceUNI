@@ -49,6 +49,7 @@ export default function MatriculaPage() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData() }, [auth?.id])
 
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function MatriculaPage() {
     setSaving(true)
     setError('')
     try {
-      const m = await matriculaService.crear({ id_periodo: periodo.id })
+      await matriculaService.crear({ id_periodo: periodo.id })
       setSuccess('Matrícula creada exitosamente')
       await fetchData()
     } catch (e) {

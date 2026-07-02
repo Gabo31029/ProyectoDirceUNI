@@ -86,6 +86,7 @@ export default function OfertaPage() {
     }).catch(() => {})
   }, [])
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [activeTab, selectedPeriodo])
 
   // Cargar tipos de evaluación cuando se va a abrir el modal de curso
@@ -203,7 +204,7 @@ export default function OfertaPage() {
         setSuccess('Curso creado')
       } else if (modalType === 'seccion') {
         const docentes = Object.entries(seccionDocentes)
-          .filter(([_, d]) => d.id_usuario_docente)
+          .filter(([, d]) => d.id_usuario_docente)
           .map(([id_tipo_evaluacion, d]) => ({
             id_tipo_evaluacion,
             id_usuario_docente: d.id_usuario_docente,

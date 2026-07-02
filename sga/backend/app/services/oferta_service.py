@@ -63,16 +63,18 @@ def _map_seccion(row: asyncpg.Record) -> SeccionResponse:
 
 
 def _map_evaluacion(row: asyncpg.Record) -> EvaluacionAcademicaResponse:
+    row_dict = dict(row)
     return EvaluacionAcademicaResponse(
-        id=row["id"],
-        id_seccion=row["id_seccion"],
-        id_tipo_evaluacion=row["id_tipo_evaluacion"],
-        id_escala=row["id_escala"],
-        peso_relativo=row["peso_relativo"],
-        orden_presentacion=row["orden_presentacion"],
-        estado=row["estado"],
-        created_at=row["created_at"],
-        updated_at=row["updated_at"],
+        id=row_dict["id"],
+        id_seccion=row_dict["id_seccion"],
+        id_tipo_evaluacion=row_dict["id_tipo_evaluacion"],
+        id_escala=row_dict["id_escala"],
+        peso_relativo=row_dict["peso_relativo"],
+        orden_presentacion=row_dict["orden_presentacion"],
+        estado=row_dict["estado"],
+        nombre_tipo_evaluacion=row_dict.get("nombre_tipo_evaluacion"),
+        created_at=row_dict["created_at"],
+        updated_at=row_dict["updated_at"],
     )
 
 
