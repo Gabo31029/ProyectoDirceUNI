@@ -72,8 +72,8 @@ class TipoEvento(Base):
     id_tenant = Column(String(36), ForeignKey("tenants.id_tenant", ondelete="RESTRICT"), nullable=False)
     codigo = Column(String(50), nullable=False)
     nombre = Column(String(150), nullable=False)
-    cuenta_objetivo = Column(String(50), nullable=False)
-    operacion = Column(String(20), nullable=False)  # INCREMENTO, DECREMENTO, ASIGNACION
+    cuenta_objetivo = Column(String(50), nullable=True)
+    operacion = Column(String(20), nullable=True)  # INCREMENTO, DECREMENTO, ASIGNACION
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     __table_args__ = (

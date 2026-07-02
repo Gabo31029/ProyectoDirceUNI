@@ -135,7 +135,15 @@ export default function CatalogosPage() {
           <>
             <div className="form-group">
               <label className="form-label" htmlFor="evento-cuenta">Cuenta objetivo</label>
-              <input id="evento-cuenta" className="form-input" value={form.cuenta_objetivo || ''} onChange={e => setForm({ ...form, cuenta_objetivo: e.target.value })} />
+              <select id="evento-cuenta" className="form-select" value={form.cuenta_objetivo || ''} onChange={e => setForm({ ...form, cuenta_objetivo: e.target.value || null })}>
+                <option value="">Sin cuenta objetivo</option>
+                <option value="CTA-DESAPROBACIONES">Cursos Desaprobados (CTA-DESAPROBACIONES)</option>
+                <option value="CTA-CREDITOS-APROBADOS">Créditos Aprobados (CTA-CREDITOS-APROBADOS)</option>
+                <option value="CTA-CREDITOS-INSCRITOS">Créditos Inscritos (CTA-CREDITOS-INSCRITOS)</option>
+                <option value="CTA-RESERVAS-MATRICULA">Reservas de Matrícula (CTA-RESERVAS-MATRICULA)</option>
+                <option value="CTA-CONDICION-ACADEMICA">Condición Académica (CTA-CONDICION-ACADEMICA)</option>
+                <option value="CTA-PROMEDIO-SNAPSHOT">Snapshot de Promedio (CTA-PROMEDIO-SNAPSHOT)</option>
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="evento-op">Operación</label>

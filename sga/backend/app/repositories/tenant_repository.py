@@ -158,18 +158,33 @@ class TenantRepository:
         operacion: str | None,
     ) -> asyncpg.Record:
         async with self.pool.acquire() as conn:
-            return await conn.fetchrow(
-                """
-                INSERT INTO cat_tipo_evento (
-                    id_tenant, codigo, nombre, cuenta_objetivo, operacion
-                ) VALUES ($1, $2, $3, $4, $5) RETURNING *
-                """,
-                tenant_id,
-                codigo,
-                nombre,
-                cuenta_objetivo,
-                operacion,
-            )
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO cat_tipo_evento (
+                        id_tenant, codigo, nombre, cuenta_objetivo, operacion
+                    ) VALUES ($1, $2, $3, $4, $5) RETURNING *
+                    """,
+                    tenant_id,
+                    codigo,
+                    nombre,
+                    cuenta_objetivo,
+                    operacion,
+                )
+                await conn.execute(
+                    """
+                    INSERT INTO tipo_evento (
+                        id_tipo_evento, id_tenant, codigo, nombre, cuenta_objetivo, operacion
+                    ) VALUES ($1, $2, $3, $4, $5, $6)
+                    """,
+                    row["id"],
+                    tenant_id,
+                    codigo,
+                    nombre,
+                    cuenta_objetivo,
+                    operacion,
+                )
+                return row
 
     async def list_tipos_evento(self, tenant_id: UUID) -> list[asyncpg.Record]:
         async with self.pool.acquire() as conn:

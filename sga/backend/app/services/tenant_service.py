@@ -84,6 +84,41 @@ class TenantService:
                         descripcion,
                     )
 
+                default_events = [
+                    ("EVT-NOTA-FINAL-CALCULADA", "Nota Final Calculada", "CTA-CREDITOS-APROBADOS", "INCREMENTO"),
+                    ("EVT-REPROBO-CURSO", "Reprobó Curso", "CTA-DESAPROBACIONES", "INCREMENTO"),
+                    ("EVT-SNAPSHOT-PROMEDIO", "Snapshot de Promedio Semestral/Acumulado", "CTA-PROMEDIO-SNAPSHOT", "ASIGNACION"),
+                    ("EVT-CONDICION-ACTIVADA", "Condición Académica Activada", None, None),
+                    ("EVT-CONDICION-RESUELTA", "Condición Académica Resuelta", None, None),
+                    ("EVT-NOTA-CORREGIDA", "Nota Corregida por Docente", "CTA-CREDITOS-APROBADOS", "INCREMENTO"),
+                ]
+                for codigo, nombre, cuenta_obj, operacion in default_events:
+                    evt_id = uuid.uuid4()
+                    await conn.execute(
+                        """
+                        INSERT INTO cat_tipo_evento (id, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        evt_id,
+                        row["id"],
+                        codigo,
+                        nombre,
+                        cuenta_obj,
+                        operacion,
+                    )
+                    await conn.execute(
+                        """
+                        INSERT INTO tipo_evento (id_tipo_evento, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        evt_id,
+                        row["id_tenant"],
+                        codigo,
+                        nombre,
+                        cuenta_obj,
+                        operacion,
+                    )
+
                 await self.audit_repo.registrar(
                     conn,
                     id_tenant=row["id"],
