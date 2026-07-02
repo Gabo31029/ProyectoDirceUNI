@@ -1,5 +1,5 @@
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 import asyncpg
 
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
@@ -195,19 +195,31 @@ class PeriodoService:
                 ppa = pps  # En esta fase simplificada
 
                 # 3. Guardar el snapshot
-                await conn.execute(
-                    """
-                    INSERT INTO snapshot_promedio (id_perfil_alumno, id_periodo, id_tenant, pps, ppa)
-                    VALUES ($1, $2, $3, $4, $5)
-                    ON CONFLICT (id_perfil_alumno, id_periodo) DO UPDATE
-                    SET pps = EXCLUDED.pps, ppa = EXCLUDED.ppa
-                    """,
+                snapshot_id = await conn.fetchval(
+                    "SELECT id_snapshot FROM snapshot_promedio WHERE id_perfil_alumno = $1 AND id_periodo = $2 AND id_snapshot_anterior IS NULL",
                     alumno_id,
                     periodo_id,
-                    tenant_id,
-                    pps,
-                    ppa,
                 )
+                if snapshot_id:
+                    await conn.execute(
+                        "UPDATE snapshot_promedio SET pps = $1, ppa = $2 WHERE id_snapshot = $3",
+                        pps,
+                        ppa,
+                        snapshot_id,
+                    )
+                else:
+                    await conn.execute(
+                        """
+                        INSERT INTO snapshot_promedio (id_snapshot, id_perfil_alumno, id_periodo, id_tenant, pps, ppa)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                        """,
+                        uuid4(),
+                        alumno_id,
+                        periodo_id,
+                        tenant_id,
+                        pps,
+                        ppa,
+                    )
 
     # --- Métodos de CRUD para políticas ---
     async def add_politica_credito(
