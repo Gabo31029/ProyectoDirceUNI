@@ -31,4 +31,7 @@ export const ofertaService = {
 
   // Tipos de evaluación del tenant (para configurar pesos en cursos)
   listarTiposEvaluacion: (tenantId) => api.get(`/tenants/${tenantId}/catalogos/tipos-evaluacion`).then(r => r.data),
+
+  // Alumnos inscritos en una sección (para docentes al registrar notas)
+  listarInscripcionesSeccion: (seccionId) => api.get(`/oferta/secciones/${seccionId}/inscripciones`).then(r => r.data),
 }

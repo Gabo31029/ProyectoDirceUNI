@@ -169,3 +169,16 @@ async def listar_evaluaciones_academica(
 ) -> list[EvaluacionAcademicaResponse]:
     tenant_id = resolve_tenant_id(current_user)
     return await _oferta_service().list_evaluaciones(tenant_id, seccion_id)
+
+
+@router.get("/secciones/{seccion_id}/inscripciones")
+async def listar_inscripciones_seccion(
+    seccion_id: UUID,
+    current_user: CurrentUser = Depends(require_roles("ADMIN", "DOCENTE")),
+) -> list[dict]:
+    """
+    Lista los alumnos activamente inscritos en una sección.
+    Retorna id de inscripción, nombre, apellido y email del alumno.
+    """
+    tenant_id = resolve_tenant_id(current_user)
+    return await _oferta_service().list_inscripciones_seccion(tenant_id, seccion_id)

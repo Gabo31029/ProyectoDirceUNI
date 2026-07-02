@@ -16,6 +16,7 @@ from app.models.schemas import (
 from app.repositories.audit_repository import AuditRepository
 from app.repositories.oferta_repository import OfertaRepository
 from app.repositories.periodo_repository import PeriodoRepository
+from app.repositories.matricula_repository import MatriculaRepository
 
 
 def _map_plan(row: asyncpg.Record) -> PlanEstudiosResponse:
@@ -81,6 +82,7 @@ class OfertaService:
         self.repo = OfertaRepository(pool)
         self.periodo_repo = PeriodoRepository(pool)
         self.audit_repo = AuditRepository()
+        self.matricula_repo = MatriculaRepository(pool)
 
     # --- Plan de Estudios ---
     async def crear_plan_estudios(
@@ -623,3 +625,11 @@ class OfertaService:
             raise NotFoundError("Seccion no encontrada.")
         rows = await self.repo.list_evaluaciones_by_seccion(seccion_id)
         return [_map_evaluacion(r) for r in rows]
+
+    async def list_inscripciones_seccion(self, tenant_id: UUID, seccion_id: UUID) -> list[dict]:
+        """Lista los alumnos inscritos activos en una sección con sus datos."""
+        seccion = await self.repo.get_seccion_by_id(seccion_id, tenant_id)
+        if seccion is None:
+            raise NotFoundError("Seccion no encontrada.")
+        rows = await self.matricula_repo.list_inscripciones_by_seccion(seccion_id, tenant_id)
+        return [dict(r) for r in rows]

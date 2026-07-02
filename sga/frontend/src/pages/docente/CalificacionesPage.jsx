@@ -6,7 +6,6 @@ import ErrorAlert, { SuccessAlert } from '../../components/ErrorAlert'
 import { periodoService } from '../../services/periodoService'
 import { ofertaService } from '../../services/ofertaService'
 import { calificacionService } from '../../services/calificacionService'
-import { matriculaService } from '../../services/matriculaService'
 
 export default function CalificacionesPage() {
   const [periodos, setPeriodos] = useState([])
@@ -17,6 +16,7 @@ export default function CalificacionesPage() {
   const [selectedEvaluacion, setSelectedEvaluacion] = useState('')
   const [inscripciones, setInscripciones] = useState([])
   const [notas, setNotas] = useState({})
+  const [loadingAlumnos, setLoadingAlumnos] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -48,9 +48,20 @@ export default function CalificacionesPage() {
       .catch(() => setEvaluaciones([]))
   }, [selectedSeccion])
 
+  // Cargar alumnos inscritos cuando cambia la sección
   useEffect(() => {
-    if (!selectedSeccion) { setInscripciones([]); return }
-    setInscripciones([])
+    if (!selectedSeccion) { setInscripciones([]); setNotas({}); return }
+    setLoadingAlumnos(true)
+    ofertaService.listarInscripcionesSeccion(selectedSeccion)
+      .then(data => {
+        setInscripciones(data)
+        // Inicializar notas vacías para cada inscripción
+        const init = {}
+        data.forEach(insc => { init[insc.id] = '' })
+        setNotas(init)
+      })
+      .catch(() => { setInscripciones([]); setNotas({}) })
+      .finally(() => setLoadingAlumnos(false))
   }, [selectedSeccion])
 
   const evalObj = evaluaciones.find(c => c.id === selectedEvaluacion)
@@ -61,7 +72,7 @@ export default function CalificacionesPage() {
       .filter(([, v]) => v !== '')
       .map(([id_inscripcion, valor_nota]) => ({ id_inscripcion, valor_nota: parseFloat(valor_nota) }))
     if (calificaciones.length === 0) {
-      setError('Agrega al menos una calificación')
+      setError('Ingresa al menos una nota')
       return
     }
     setSaving(true)
@@ -69,7 +80,10 @@ export default function CalificacionesPage() {
     try {
       await calificacionService.registrar(selectedSeccion, selectedEvaluacion, calificaciones)
       setSuccess(`${calificaciones.length} calificación(es) registrada(s) en borrador`)
-      setNotas({})
+      // Limpiar solo las notas, mantener la lista de alumnos
+      const reset = {}
+      inscripciones.forEach(insc => { reset[insc.id] = '' })
+      setNotas(reset)
     } catch (e) {
       setError(e.response?.data?.detail || 'Error al registrar')
     } finally {
@@ -129,7 +143,7 @@ export default function CalificacionesPage() {
               <label className="form-label" htmlFor="sel-seccion-cal">Sección</label>
               <select id="sel-seccion-cal" className="form-select" value={selectedSeccion} onChange={e => setSelectedSeccion(e.target.value)}>
                 <option value="">— Selecciona sección —</option>
-                {secciones.map(s => <option key={s.id} value={s.id}>Sección {s.codigo_seccion}</option>)}
+                {secciones.map(s => <option key={s.id} value={s.id}>Sección {s.codigo_seccion} — {s.nombre_curso}</option>)}
               </select>
             </div>
             <div className="form-group" style={{ margin: 0 }}>
@@ -202,63 +216,67 @@ export default function CalificacionesPage() {
               {evalObj && <Badge value={evalObj.estado} dot />}
             </div>
 
-            <div className="alert alert-info mb-4">
-              <span>Info:</span>
-              <span>Ingresa el ID de inscripción y la nota del alumno. Las notas se guardan en estado <strong>BORRADOR</strong> hasta publicar la evaluación.</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {[1, 2, 3].map(i => (
-                <div key={i} className="grid-2" style={{ gap: 12 }}>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label" htmlFor={`inscr-id-${i}`}>ID Inscripción #{i}</label>
-                    <input
-                      id={`inscr-id-${i}`}
-                      className="form-input"
-                      placeholder="UUID de la inscripción"
-                      value={Object.keys(notas)[i - 1] || ''}
-                      onChange={e => {
-                        const newNotas = { ...notas }
-                        const keys = Object.keys(newNotas)
-                        const oldKey = keys[i - 1]
-                        if (oldKey) delete newNotas[oldKey]
-                        if (e.target.value) newNotas[e.target.value] = Object.values(notas)[i - 1] || ''
-                        setNotas(newNotas)
-                      }}
-                    />
-                  </div>
-                  <div className="form-group" style={{ margin: 0 }}>
-                    <label className="form-label" htmlFor={`nota-val-${i}`}>Nota #{i}</label>
-                    <input
-                      id={`nota-val-${i}`}
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      className="form-input"
-                      placeholder="0.0 - 20.0"
-                      value={Object.values(notas)[i - 1] || ''}
-                      onChange={e => {
-                        const newNotas = { ...notas }
-                        const key = Object.keys(notas)[i - 1]
-                        if (key) newNotas[key] = e.target.value
-                        setNotas(newNotas)
-                      }}
-                    />
-                  </div>
+            {loadingAlumnos ? (
+              <div className="loading-container"><div className="spinner" /></div>
+            ) : inscripciones.length === 0 ? (
+              <div className="empty-state">
+                <span className="empty-state-icon">👨‍🎓</span>
+                <span className="empty-state-title">Sin alumnos inscritos</span>
+                <span className="empty-state-text">No hay alumnos activos en esta sección.</span>
+              </div>
+            ) : (
+              <>
+                <div className="alert alert-info mb-4">
+                  <span>Ingresa la nota para cada alumno (0.0 – 20.0). Las notas se guardan en estado <strong>BORRADOR</strong> hasta publicar la evaluación.</span>
                 </div>
-              ))}
-            </div>
 
-            <div className="modal-footer" style={{ paddingBottom: 0 }}>
-              <button
-                id="btn-registrar-calificaciones"
-                className="btn btn-primary"
-                onClick={handleRegistrar}
-                disabled={saving || evalObj?.estado === 'CERRADO'}
-              >
-                {saving ? 'Registrando...' : 'Registrar Calificaciones'}
-              </button>
-            </div>
+                <table className="data-table" style={{ marginBottom: 20 }}>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Alumno</th>
+                      <th>Email</th>
+                      <th>Nota (0–20)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inscripciones.map((insc, idx) => (
+                      <tr key={insc.id}>
+                        <td>{idx + 1}</td>
+                        <td className="cell-primary">{insc.apellido}, {insc.nombre}</td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{insc.email}</td>
+                        <td style={{ width: 140 }}>
+                          <input
+                            id={`nota-${insc.id}`}
+                            type="number"
+                            min="0"
+                            max="20"
+                            step="0.1"
+                            className="form-input"
+                            placeholder="—"
+                            style={{ textAlign: 'center' }}
+                            value={notas[insc.id] ?? ''}
+                            onChange={e => setNotas(prev => ({ ...prev, [insc.id]: e.target.value }))}
+                            disabled={evalObj?.estado === 'CERRADO'}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="modal-footer" style={{ paddingBottom: 0 }}>
+                  <button
+                    id="btn-registrar-calificaciones"
+                    className="btn btn-primary"
+                    onClick={handleRegistrar}
+                    disabled={saving || evalObj?.estado === 'CERRADO'}
+                  >
+                    {saving ? 'Registrando...' : 'Registrar Calificaciones'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

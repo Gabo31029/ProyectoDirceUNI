@@ -386,6 +386,31 @@ class MatriculaRepository:
         )
         return list(rows)
 
+    async def list_inscripciones_by_seccion(
+        self, seccion_id: UUID, tenant_id: UUID
+    ) -> list[asyncpg.Record]:
+        """Lista las inscripciones activas de una sección con datos del alumno."""
+        rows = await self.pool.fetch(
+            """
+            SELECT i.id, i.id_matricula, i.id_curso, i.id_seccion, i.estado,
+                   i.creditos, i.fecha_inscripcion,
+                   u.id   AS id_alumno,
+                   u.nombre, u.apellido, u.email,
+                   c.nombre_curso, c.codigo_curso
+            FROM inscripcion i
+            JOIN matricula m ON i.id_matricula = m.id
+            JOIN usuarios u  ON m.id_alumno = u.id
+            JOIN curso c     ON i.id_curso = c.id
+            WHERE i.id_seccion = $1
+              AND i.id_tenant = $2
+              AND i.estado = 'ACTIVA'
+            ORDER BY u.apellido, u.nombre
+            """,
+            seccion_id,
+            tenant_id,
+        )
+        return list(rows)
+
     async def create_inscripcion(
         self,
         conn: asyncpg.Connection,
