@@ -13,7 +13,7 @@ class HistorialRepository:
     OR asociativo propio y se agrupa de manera limpia en esta clase.
     """
     
-    def get_inscriptions_history(self, db: Session, id_perfil_alumno: str) -> List[Inscripcion]:
+    def get_inscriptions_history(self, db: Session, id_perfil_alumno: str) -> List[tuple]:
         """
         Recupera el historial de asignaturas en las que se ha inscrito el alumno.
         
@@ -22,11 +22,11 @@ class HistorialRepository:
         y secundariamente de forma alfabética por el código del curso.
         """
         return (
-            db.query(Inscripcion)
-            .join(Matricula, Inscripcion.id_matricula == Matricula.id_matricula)
-            .join(Seccion, Inscripcion.id_seccion == Seccion.id_seccion)
-            .join(Curso, Seccion.id_curso == Curso.id_curso)
-            .join(PeriodoAcademico, Seccion.id_periodo == PeriodoAcademico.id_periodo)
+            db.query(Inscripcion, Seccion, Curso, PeriodoAcademico)
+            .join(Matricula, (Inscripcion.id_matricula == Matricula.id_matricula) | (Inscripcion.id_matricula == Matricula.id))
+            .join(Seccion, (Inscripcion.id_seccion == Seccion.id_seccion) | (Inscripcion.id_seccion == Seccion.id))
+            .join(Curso, (Seccion.id_curso == Curso.id_curso) | (Seccion.id_curso == Curso.id))
+            .join(PeriodoAcademico, (Seccion.id_periodo == PeriodoAcademico.id_periodo) | (Seccion.id_periodo == PeriodoAcademico.id))
             .filter(Matricula.id_perfil_alumno == id_perfil_alumno)
             .order_by(PeriodoAcademico.fecha_inicio.asc(), Curso.codigo_curso.asc())
             .all()

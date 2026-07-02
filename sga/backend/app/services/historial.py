@@ -34,14 +34,19 @@ def obtener_historial_consolidado(
         4. Ordenamiento cronológico de los períodos académicos de forma ascendente.
     - Auditoría: Registra la operación 'CONSULTAR_HISTORIAL' en la tabla de auditoría.
     """
-    # Validar existencia del perfil de alumno
-    perfil = db.query(PerfilAlumno).filter(PerfilAlumno.id_perfil_alumno == id_perfil_alumno).first()
+    # Validar existencia del perfil de alumno (buscando por id_perfil_alumno o id_usuario)
+    perfil = db.query(PerfilAlumno).filter(
+        (PerfilAlumno.id_perfil_alumno == id_perfil_alumno) | (PerfilAlumno.id_usuario == id_perfil_alumno)
+    ).first()
     if not perfil:
         log_audit(db, user.id_tenant, user.id_usuario, "CONSULTAR_HISTORIAL", "perfil_alumno", id_perfil_alumno, "RECHAZADA", motivo_rechazo="Perfil del alumno no encontrado.")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil del alumno no encontrado.")
 
+    # Resolver el id_perfil_alumno correcto
+    id_perfil_alumno = perfil.id_perfil_alumno
+
     # Control de accesos
-    if user.rol == "ALUMNO" and user.id_perfil != id_perfil_alumno:
+    if user.rol == "ALUMNO" and user.id_perfil != id_perfil_alumno and user.id_usuario != id_perfil_alumno:
         log_audit(db, user.id_tenant, user.id_usuario, "CONSULTAR_HISTORIAL", "perfil_alumno", id_perfil_alumno, "RECHAZADA", motivo_rechazo="Alumno intentando ver otro historial.")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso para ver el historial de otro alumno.")
 
@@ -56,9 +61,11 @@ def obtener_historial_consolidado(
         latest_snapshots_by_period[snap.id_periodo] = snap
 
     # 3. Estructurar y agrupar inscripciones de cursos por período académico
+    from app.models.calificacion import EvaluacionAcademica, Calificacion
     periods_map = {}
-    for ins in inscriptions:
-        periodo = ins.seccion.periodo
+    creditos_aprobados = 0
+
+    for ins, seccion, curso, periodo in inscriptions:
         pid = periodo.id_periodo
         if pid not in periods_map:
             periods_map[pid] = {
@@ -70,14 +77,52 @@ def obtener_historial_consolidado(
                 "ppa": 0.00
             }
             
+        # Obtener evaluaciones y calificaciones correspondientes para este curso
+        evaluaciones = db.query(EvaluacionAcademica).filter(
+            EvaluacionAcademica.id_seccion == ins.id_seccion
+        ).all()
+        
+        calificaciones = db.query(Calificacion).filter(
+            Calificacion.id_inscripcion == ins.id_inscripcion
+        ).all()
+        
+        calif_map = {c.id_evaluacion: c for c in calificaciones}
+        
+        eval_list = []
+        for ev in evaluaciones:
+            c = calif_map.get(ev.id_evaluacion)
+            eval_list.append({
+                "id_evaluacion": ev.id_evaluacion,
+                "nombre_tipo_evaluacion": ev.tipo_evaluacion.nombre if ev.tipo_evaluacion else ev.id_tipo_evaluacion,
+                "peso_relativo": float(ev.peso_relativo),
+                "nota": float(c.valor_nota) if c and c.valor_nota is not None else None,
+                "estado_nota": c.estado if c else "PENDIENTE"
+            })
+            
+        # Calcular promedio ponderado del curso dinámicamente si no está asentado
+        graded_evals = [e for e in eval_list if e["nota"] is not None]
+        if ins.nota_final is not None:
+            promedio_curso = float(ins.nota_final)
+        elif graded_evals:
+            sum_pesos = sum(e["peso_relativo"] for e in graded_evals)
+            sum_prod = sum(e["nota"] * e["peso_relativo"] for e in graded_evals)
+            promedio_curso = round(sum_prod / sum_pesos, 2) if sum_pesos > 0 else 0.0
+        else:
+            promedio_curso = None
+            
+        if ins.estado == "APROBADA":
+            creditos_aprobados += curso.creditos
+            
         periods_map[pid]["inscripciones"].append({
             "id_inscripcion": ins.id_inscripcion,
-            "codigo_curso": ins.seccion.curso.codigo_curso,
-            "nombre_curso": ins.seccion.curso.nombre_curso,
-            "creditos": ins.seccion.curso.creditos,
+            "codigo_curso": curso.codigo_curso,
+            "nombre_curso": curso.nombre_curso,
+            "creditos": curso.creditos,
             "nota_final": float(ins.nota_final) if ins.nota_final is not None else None,
+            "promedio_ponderado_curso": promedio_curso,
             "estado": ins.estado,
-            "codigo_seccion": ins.seccion.codigo_seccion
+            "codigo_seccion": seccion.codigo_seccion,
+            "evaluaciones": eval_list
         })
 
     # Vincular los promedios semestral y acumulado a la estructura de cada período
@@ -112,6 +157,17 @@ def obtener_historial_consolidado(
     
     ppa_actual = float(latest_snap.ppa) if latest_snap else 0.00
 
+    condicion_academica = "NORMAL"
+    active_conds = [c for c in formatted_conditions if c["estado"] == "ACTIVA"]
+    if active_conds:
+        condicion_academica = active_conds[-1]["nombre_condicion"]
+
+    resumen = {
+        "ppa": ppa_actual,
+        "creditos_aprobados": creditos_aprobados,
+        "condicion_academica": condicion_academica
+    }
+
     log_audit(db, user.id_tenant, user.id_usuario, "CONSULTAR_HISTORIAL", "perfil_alumno", id_perfil_alumno, "EXITOSA")
     
     return {
@@ -120,6 +176,7 @@ def obtener_historial_consolidado(
         "nombre_completo": perfil.usuario.nombre_completo,
         "carrera": perfil.carrera,
         "ppa_actual": ppa_actual,
+        "resumen": resumen,
         "periodos": sorted_periods,
         "condiciones": formatted_conditions
     }

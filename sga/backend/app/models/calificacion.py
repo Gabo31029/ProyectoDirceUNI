@@ -23,7 +23,7 @@ class EvaluacionAcademica(Base):
     id = Column(String(36), unique=True, nullable=True)
     id_seccion = Column(String(36), ForeignKey("seccion.id_seccion", ondelete="RESTRICT"), nullable=False)
     id_tipo_evaluacion = Column(String(36), ForeignKey("tipo_evaluacion.id_tipo_evaluacion", ondelete="RESTRICT"), nullable=False)
-    id_escala = Column(String(36), ForeignKey("escala_evaluacion.id_escala", ondelete="RESTRICT"), nullable=False)
+    id_escala = Column(String(36), ForeignKey("cat_escala_evaluacion.id", ondelete="RESTRICT"), nullable=False)
     peso_relativo = Column(Numeric(5, 2), nullable=False)
     orden_presentacion = Column(Integer, nullable=True)
     estado = Column(String(15), nullable=False, default="BORRADOR")  # BORRADOR, PUBLICADO, CERRADO
@@ -55,7 +55,6 @@ class Calificacion(Base):
     __tablename__ = "calificacion"
     
     id_calificacion = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    id = Column(String(36), unique=True, nullable=True)
     id_inscripcion = Column(String(36), ForeignKey("inscripcion.id_inscripcion", ondelete="RESTRICT"), nullable=False)
     id_evaluacion = Column(String(36), ForeignKey("evaluacion_academica.id_evaluacion", ondelete="RESTRICT"), nullable=False)
     valor_nota = Column(Numeric(5, 2), nullable=False)

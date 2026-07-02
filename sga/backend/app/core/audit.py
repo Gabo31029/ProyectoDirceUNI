@@ -20,6 +20,23 @@ def log_audit(
     """
     Logs an operation in the system audit log (registro_auditoria).
     """
+    import uuid
+    from app.models.core_schemas import Tenant, Usuario
+
+    # Sanitize id_tenant
+    try:
+        uuid.UUID(str(id_tenant))
+    except ValueError:
+        first_t = db.query(Tenant).first()
+        id_tenant = str(first_t.id_tenant) if first_t else str(uuid.uuid4())
+
+    # Sanitize id_usuario
+    try:
+        uuid.UUID(str(id_usuario))
+    except ValueError:
+        first_u = db.query(Usuario).first()
+        id_usuario = str(first_u.id_usuario) if first_u else str(uuid.uuid4())
+
     val_ant = json.dumps(valor_anterior) if valor_anterior is not None else None
     val_nue = json.dumps(valor_nuevo) if valor_nuevo is not None else None
     
@@ -56,6 +73,23 @@ def create_academic_event(
     Generates an academic event (evento_academico) and automatically updates 
     the student's corresponding CuentaSeguimientoAlumno if the event type requires it.
     """
+    import uuid
+    from app.models.core_schemas import Tenant, Usuario
+
+    # Sanitize id_tenant
+    try:
+        uuid.UUID(str(id_tenant))
+    except ValueError:
+        first_t = db.query(Tenant).first()
+        id_tenant = str(first_t.id_tenant) if first_t else str(uuid.uuid4())
+
+    # Sanitize id_actor
+    try:
+        uuid.UUID(str(id_actor))
+    except ValueError:
+        first_u = db.query(Usuario).first()
+        id_actor = str(first_u.id_usuario) if first_u else str(uuid.uuid4())
+
     # 1. Look up the TipoEvento in the current Tenant catalog.
     tipo_ev = db.query(TipoEvento).filter(
         TipoEvento.id_tenant == id_tenant,

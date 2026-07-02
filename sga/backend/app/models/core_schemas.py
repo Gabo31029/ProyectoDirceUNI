@@ -1,18 +1,18 @@
 import uuid
 from datetime import datetime, date, timezone
 from sqlalchemy import Column, String, Boolean, Integer, Numeric, Date, DateTime, ForeignKey, UniqueConstraint, CheckConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from app.models.base import Base
 
 class Tenant(Base):
     __tablename__ = "tenants"
     
     id_tenant = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    nombre_institucional = Column(String(200), nullable=False)
+    id = Column(String(36), unique=True, nullable=True)
+    nombre = Column(String(200), nullable=False)
     dominio = Column(String(100), unique=True, nullable=False)
     zona_horaria = Column(String(60), nullable=False, default="America/Lima")
     estado = Column(String(10), nullable=False, default="ACTIVO")  # ACTIVO, INACTIVO
-    fecha_registro = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
@@ -21,16 +21,18 @@ class Tenant(Base):
     )
 
 class EscalaEvaluacion(Base):
-    __tablename__ = "escala_evaluacion"
+    __tablename__ = "cat_escala_evaluacion"
     
-    id_escala = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     id_tenant = Column(String(36), ForeignKey("tenants.id_tenant", ondelete="RESTRICT"), nullable=False)
     nombre_escala = Column(String(100), nullable=False)
     nota_minima = Column(Numeric(5, 2), nullable=False)
     nota_maxima = Column(Numeric(5, 2), nullable=False)
     nota_aprobatoria = Column(Numeric(5, 2), nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    # Map id_escala as a synonym of id to maintain legacy model compatibility
+    id_escala = synonym("id")
     
     __table_args__ = (
         UniqueConstraint("id_tenant", name="uq_escala_tenant"),
@@ -189,6 +191,7 @@ class Curso(Base):
     __tablename__ = "curso"
     
     id_curso = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(String(36), unique=True, nullable=True)
     id_tenant = Column(String(36), ForeignKey("tenants.id_tenant", ondelete="RESTRICT"), nullable=False)
     codigo_curso = Column(String(20), nullable=False)
     nombre_curso = Column(String(200), nullable=False)
@@ -252,6 +255,7 @@ class Matricula(Base):
     __tablename__ = "matricula"
     
     id_matricula = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = Column(String(36), unique=True, nullable=True)
     id_perfil_alumno = Column(String(36), ForeignKey("perfil_alumno.id_perfil_alumno", ondelete="RESTRICT"), nullable=False)
     id_periodo = Column(String(36), ForeignKey("periodo_academico.id_periodo", ondelete="RESTRICT"), nullable=False)
     fecha_registro = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

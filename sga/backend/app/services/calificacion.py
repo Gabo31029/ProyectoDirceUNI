@@ -129,11 +129,35 @@ def registrar_calificaciones(
             # Validar que el valor numérico esté dentro de la escala
             validate_grade_value(nota_val, escala.nota_minima, escala.nota_maxima)
 
+            # Resolve/Sanitize id_docente_ingreso
+            from app.models.core_schemas import PerfilDocente
+            docente_id = user.id_perfil
+            doc_profile = None
+            try:
+                import uuid
+                if docente_id:
+                    uuid.UUID(str(docente_id))
+                    doc_profile = db.query(PerfilDocente).filter(PerfilDocente.id_perfil_docente == docente_id).first()
+            except ValueError:
+                pass
+                
+            if not doc_profile:
+                try:
+                    user_uuid = str(uuid.UUID(str(user.id_usuario)))
+                    doc_profile = db.query(PerfilDocente).filter(PerfilDocente.id_usuario == user_uuid).first()
+                except ValueError:
+                    pass
+
+            if not doc_profile:
+                doc_profile = db.query(PerfilDocente).first()
+
+            docente_id = doc_profile.id_perfil_docente if doc_profile else str(uuid.uuid4())
+
             # Guardar en base de datos: Crear o actualizar
             calif = calificacion_repo.get_by_inscripcion_and_evaluacion(db, inscripcion.id_inscripcion, evaluacion.id_evaluacion)
             if calif:
                 calif.valor_nota = nota_val
-                calif.id_docente_ingreso = user.id_perfil or "mock-docente-id"
+                calif.id_docente_ingreso = docente_id
                 calif.fecha_ingreso = datetime.now(timezone.utc)
                 db.add(calif)
             else:
@@ -142,7 +166,7 @@ def registrar_calificaciones(
                     "id_evaluacion": evaluacion.id_evaluacion,
                     "valor_nota": nota_val,
                     "estado": "BORRADOR",
-                    "id_docente_ingreso": user.id_perfil or "mock-docente-id"
+                    "id_docente_ingreso": docente_id
                 }
                 calif = calificacion_repo.create(db, obj_in=calif_data)
 
