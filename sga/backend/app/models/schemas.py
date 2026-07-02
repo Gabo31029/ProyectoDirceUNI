@@ -353,11 +353,18 @@ class SeccionEstado(str, Enum):
     SUSPENDIDA = "SUSPENDIDA"
 
 
+class DocenteAsignacionInput(BaseModel):
+    id_usuario_docente: UUID
+    id_tipo_evaluacion: UUID
+    es_coordinador: bool = False
+
+
 class SeccionCreate(BaseModel):
     id_periodo: UUID
     id_curso: UUID
     codigo_seccion: str = Field(min_length=1, max_length=10)
     vacantes_maximas: int = Field(gt=0)
+    docentes: list[DocenteAsignacionInput] = []
 
 
 class SeccionResponse(BaseModel):

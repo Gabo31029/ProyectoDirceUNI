@@ -1,15 +1,15 @@
--- SGA: Unified Database Schema for PostgreSQL / Supabase
--- Supports both Phase 1 (Raw SQL / asyncpg) and Phase 2/3 (SQLAlchemy / ORM)
+-- =============================================================================
+-- GENERADO por ./db/build_schema.sh — no editar schema.sql a mano.
+-- Fuente: db/migrations/*.sql — ver db/README.md
+-- =============================================================================
+
+-- SGA Fase 1: Auth, Tenant, Usuarios (Leonardo Chavez Miranda)
+-- Responsable: editar solo este archivo para cambios de auth/tenant.
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ==========================================
--- 1. BASE TABLES (PHASE 1 CONVENTIONS)
--- ==========================================
-
 CREATE TABLE tenants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_tenant UUID UNIQUE DEFAULT gen_random_uuid(), -- SQLAlchemy compatibility
     nombre VARCHAR(255) NOT NULL,
     dominio VARCHAR(100) NOT NULL UNIQUE,
     zona_horaria VARCHAR(64) NOT NULL DEFAULT 'America/Lima',
@@ -46,7 +46,6 @@ CREATE INDEX idx_usuarios_tenant ON usuarios (id_tenant);
 CREATE INDEX idx_usuarios_email ON usuarios (email);
 CREATE UNIQUE INDEX uq_usuario_admin_central_email ON usuarios (email) WHERE id_tenant IS NULL;
 
--- Catalog tables (Phase 1)
 CREATE TABLE cat_escala_evaluacion (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
@@ -125,13 +124,20 @@ CREATE TABLE auditoria_eventos (
 
 CREATE INDEX idx_auditoria_tenant_fecha ON auditoria_eventos (id_tenant, created_at DESC);
 
--- ==========================================
--- 2. ACADEMIC PERIODS & OFFER TABLES
--- ==========================================
+INSERT INTO tenants (id, nombre, dominio, zona_horaria)
+VALUES (
+    'a1111111-1111-1111-1111-111111111111',
+    'Universidad Demo',
+    'uni-demo',
+    'America/Lima'
+);
+
+
+-- SGA Fase 1: Periodos Académicos y Políticas (Dair Ramos)
+-- Responsable: editar solo este archivo para periodos y políticas.
 
 CREATE TABLE periodo_academico (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_periodo UUID UNIQUE DEFAULT gen_random_uuid(), -- SQLAlchemy compatibility
     id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
     nombre_periodo VARCHAR(20) NOT NULL,
     fecha_inicio DATE NOT NULL,
@@ -210,9 +216,12 @@ CREATE TABLE politica_dispersion (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+
+-- SGA Fase 1: Oferta Académica (Dair Ramos)
+-- Responsable: editar solo este archivo para plan de estudios, cursos y secciones.
+
 CREATE TABLE plan_estudios (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_plan_estudios UUID UNIQUE DEFAULT gen_random_uuid(), -- SQLAlchemy compatibility
     id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
     carrera VARCHAR(200) NOT NULL,
     version_plan VARCHAR(20) NOT NULL,
@@ -226,7 +235,6 @@ CREATE TABLE plan_estudios (
 
 CREATE TABLE curso (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_curso UUID UNIQUE DEFAULT gen_random_uuid(), -- SQLAlchemy compatibility
     id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
     codigo_curso VARCHAR(20) NOT NULL,
     nombre_curso VARCHAR(200) NOT NULL,
@@ -266,7 +274,6 @@ CREATE TABLE prerrequisito (
 
 CREATE TABLE seccion (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_seccion UUID UNIQUE DEFAULT gen_random_uuid(), -- SQLAlchemy compatibility
     id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
     id_periodo UUID NOT NULL REFERENCES periodo_academico (id) ON DELETE RESTRICT,
     id_curso UUID NOT NULL REFERENCES curso (id) ON DELETE RESTRICT,
@@ -284,7 +291,6 @@ CREATE TABLE seccion (
 
 CREATE TABLE asignacion_docente_seccion (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_asignacion UUID UNIQUE DEFAULT gen_random_uuid(), -- SQLAlchemy compatibility
     id_seccion UUID NOT NULL REFERENCES seccion (id) ON DELETE RESTRICT,
     id_usuario_docente UUID NOT NULL REFERENCES usuarios (id) ON DELETE RESTRICT,
     id_tipo_componente UUID NOT NULL REFERENCES cat_tipo_componente (id) ON DELETE RESTRICT,
@@ -295,7 +301,6 @@ CREATE TABLE asignacion_docente_seccion (
 
 CREATE TABLE componente_evaluacion (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    id_componente UUID UNIQUE DEFAULT gen_random_uuid(), -- SQLAlchemy compatibility
     id_seccion UUID NOT NULL REFERENCES seccion (id) ON DELETE RESTRICT,
     id_tipo_componente UUID NOT NULL REFERENCES cat_tipo_componente (id) ON DELETE RESTRICT,
     id_escala UUID NOT NULL REFERENCES cat_escala_evaluacion (id) ON DELETE RESTRICT,
@@ -307,286 +312,182 @@ CREATE TABLE componente_evaluacion (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- ==========================================
--- 3. ID SYNCHRONIZATION TRIGGERS
--- ==========================================
 
-CREATE OR REPLACE FUNCTION sync_ids()
-RETURNS TRIGGER AS $$
-BEGIN
-    IF TG_TABLE_NAME = 'tenants' THEN
-        IF NEW.id_tenant IS NULL AND NEW.id IS NOT NULL THEN
-            NEW.id_tenant := NEW.id;
-        ELSIF NEW.id IS NULL AND NEW.id_tenant IS NOT NULL THEN
-            NEW.id := NEW.id_tenant;
-        END IF;
-    ELSIF TG_TABLE_NAME = 'periodo_academico' THEN
-        IF NEW.id_periodo IS NULL AND NEW.id IS NOT NULL THEN
-            NEW.id_periodo := NEW.id;
-        ELSIF NEW.id IS NULL AND NEW.id_periodo IS NOT NULL THEN
-            NEW.id := NEW.id_periodo;
-        END IF;
-    ELSIF TG_TABLE_NAME = 'plan_estudios' THEN
-        IF NEW.id_plan_estudios IS NULL AND NEW.id IS NOT NULL THEN
-            NEW.id_plan_estudios := NEW.id;
-        ELSIF NEW.id IS NULL AND NEW.id_plan_estudios IS NOT NULL THEN
-            NEW.id := NEW.id_plan_estudios;
-        END IF;
-    ELSIF TG_TABLE_NAME = 'curso' THEN
-        IF NEW.id_curso IS NULL AND NEW.id IS NOT NULL THEN
-            NEW.id_curso := NEW.id;
-        ELSIF NEW.id IS NULL AND NEW.id_curso IS NOT NULL THEN
-            NEW.id := NEW.id_curso;
-        END IF;
-    ELSIF TG_TABLE_NAME = 'seccion' THEN
-        IF NEW.id_seccion IS NULL AND NEW.id IS NOT NULL THEN
-            NEW.id_seccion := NEW.id;
-        ELSIF NEW.id IS NULL AND NEW.id_seccion IS NOT NULL THEN
-            NEW.id := NEW.id_seccion;
-        END IF;
-    ELSIF TG_TABLE_NAME = 'componente_evaluacion' THEN
-        IF NEW.id_componente IS NULL AND NEW.id IS NOT NULL THEN
-            NEW.id_componente := NEW.id;
-        ELSIF NEW.id IS NULL AND NEW.id_componente IS NOT NULL THEN
-            NEW.id := NEW.id_componente;
-        END IF;
-    ELSIF TG_TABLE_NAME = 'asignacion_docente_seccion' THEN
-        IF NEW.id_asignacion IS NULL AND NEW.id IS NOT NULL THEN
-            NEW.id_asignacion := NEW.id;
-        ELSIF NEW.id IS NULL AND NEW.id_asignacion IS NOT NULL THEN
-            NEW.id := NEW.id_asignacion;
-        END IF;
-    END IF;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+-- SGA: Matricula e Inscripciones (Luis Gabriel Eustaquio Avila)
+-- Responsable: editar solo este archivo para matrícula e inscripciones.
 
-CREATE TRIGGER trg_sync_tenants BEFORE INSERT OR UPDATE ON tenants FOR EACH ROW EXECUTE FUNCTION sync_ids();
-CREATE TRIGGER trg_sync_periodo BEFORE INSERT OR UPDATE ON periodo_academico FOR EACH ROW EXECUTE FUNCTION sync_ids();
-CREATE TRIGGER trg_sync_plan_estudios BEFORE INSERT OR UPDATE ON plan_estudios FOR EACH ROW EXECUTE FUNCTION sync_ids();
-CREATE TRIGGER trg_sync_curso BEFORE INSERT OR UPDATE ON curso FOR EACH ROW EXECUTE FUNCTION sync_ids();
-CREATE TRIGGER trg_sync_seccion BEFORE INSERT OR UPDATE ON seccion FOR EACH ROW EXECUTE FUNCTION sync_ids();
-CREATE TRIGGER trg_sync_componente BEFORE INSERT OR UPDATE ON componente_evaluacion FOR EACH ROW EXECUTE FUNCTION sync_ids();
-CREATE TRIGGER trg_sync_asignacion BEFORE INSERT OR UPDATE ON asignacion_docente_seccion FOR EACH ROW EXECUTE FUNCTION sync_ids();
-
--- ==========================================
--- 4. ALCHEMY COMPATIBILITY SCHEMA (PHASE 2/3)
--- ==========================================
-
-CREATE TABLE usuario (
-    id_usuario UUID PRIMARY KEY,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    nombre_completo VARCHAR(200) NOT NULL,
-    email VARCHAR(150) NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    rol VARCHAR(30) NOT NULL CHECK (rol IN ('ADMINISTRADOR_CENTRAL', 'ADMINISTRADOR', 'DOCENTE', 'ALUMNO')),
-    estado VARCHAR(10) NOT NULL DEFAULT 'ACTIVO' CHECK (estado IN ('ACTIVO', 'INACTIVO')),
-    fecha_registro TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+CREATE TABLE cuenta_seguimiento_alumno (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
+    id_alumno UUID NOT NULL REFERENCES usuarios (id) ON DELETE RESTRICT,
+    creditos_inscritos_periodo SMALLINT NOT NULL DEFAULT 0 CHECK (creditos_inscritos_periodo >= 0),
+    creditos_aprobados_acumulados SMALLINT NOT NULL DEFAULT 0 CHECK (creditos_aprobados_acumulados >= 0),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_usuario_email UNIQUE (id_tenant, email)
-);
-
-CREATE TABLE escala_evaluacion (
-    id_escala UUID PRIMARY KEY,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    nombre_escala VARCHAR(100) NOT NULL,
-    nota_minima NUMERIC(5, 2) NOT NULL,
-    nota_maxima NUMERIC(5, 2) NOT NULL,
-    nota_aprobatoria NUMERIC(5, 2) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_escala_tenant UNIQUE (id_tenant),
-    CONSTRAINT chk_escala_notas CHECK (nota_minima < nota_aprobatoria AND nota_aprobatoria <= nota_maxima)
-);
-
-CREATE TABLE tipo_componente (
-    id_tipo_componente UUID PRIMARY KEY,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    codigo VARCHAR(20) NOT NULL,
-    nombre VARCHAR(100) NOT NULL,
-    activo BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_tipo_componente_codigo UNIQUE (id_tenant, codigo)
-);
-
-CREATE TABLE tipo_condicion_academica (
-    id_tipo_condicion UUID PRIMARY KEY,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    codigo VARCHAR(30) NOT NULL,
-    nombre VARCHAR(100) NOT NULL,
-    descripcion VARCHAR(500),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_tipo_condicion_codigo UNIQUE (id_tenant, codigo)
-);
-
-CREATE TABLE tipo_evento (
-    id_tipo_evento UUID PRIMARY KEY,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    codigo VARCHAR(50) NOT NULL,
-    nombre VARCHAR(150) NOT NULL,
-    cuenta_objetivo VARCHAR(50) NOT NULL,
-    operacion VARCHAR(20) NOT NULL CHECK (operacion IN ('INCREMENTO', 'DECREMENTO', 'ASIGNACION')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_tipo_evento_codigo UNIQUE (id_tenant, codigo)
-);
-
-CREATE TABLE perfil_alumno (
-    id_perfil_alumno UUID PRIMARY KEY,
-    id_usuario UUID NOT NULL UNIQUE REFERENCES usuario (id_usuario) ON DELETE RESTRICT,
-    id_plan_estudios UUID NOT NULL REFERENCES plan_estudios (id_plan_estudios) ON DELETE RESTRICT,
-    codigo_alumno VARCHAR(20) NOT NULL,
-    carrera VARCHAR(200) NOT NULL,
-    ciclo_actual INTEGER,
-    periodo_ingreso VARCHAR(20) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE perfil_docente (
-    id_perfil_docente UUID PRIMARY KEY,
-    id_usuario UUID NOT NULL UNIQUE REFERENCES usuario (id_usuario) ON DELETE RESTRICT,
-    codigo_docente VARCHAR(20) NOT NULL,
-    especialidad VARCHAR(200),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    CONSTRAINT uq_cuenta_seguimiento_alumno UNIQUE (id_tenant, id_alumno)
 );
 
 CREATE TABLE matricula (
-    id_matricula UUID PRIMARY KEY,
-    id_perfil_alumno UUID NOT NULL REFERENCES perfil_alumno (id_perfil_alumno) ON DELETE RESTRICT,
-    id_periodo UUID NOT NULL REFERENCES periodo_academico (id_periodo) ON DELETE RESTRICT,
-    fecha_registro TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    estado VARCHAR(15) NOT NULL DEFAULT 'ACTIVA' CHECK (estado IN ('ACTIVA', 'RESERVADA', 'ANULADA')),
-    numero_constancia VARCHAR(50),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
+    id_alumno UUID NOT NULL REFERENCES usuarios (id) ON DELETE RESTRICT,
+    id_periodo UUID NOT NULL REFERENCES periodo_academico (id) ON DELETE RESTRICT,
+    estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA'
+        CHECK (estado IN ('ACTIVA', 'RETIRADA', 'FINALIZADA')),
+    creditos_matriculados SMALLINT NOT NULL DEFAULT 0 CHECK (creditos_matriculados >= 0),
+    fecha_matricula TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_matricula_alumno_periodo UNIQUE (id_perfil_alumno, id_periodo)
+    CONSTRAINT uq_matricula_alumno_periodo UNIQUE (id_tenant, id_alumno, id_periodo)
 );
+
+CREATE INDEX idx_matricula_tenant_periodo ON matricula (id_tenant, id_periodo);
+CREATE INDEX idx_matricula_alumno ON matricula (id_alumno);
 
 CREATE TABLE inscripcion (
-    id_inscripcion UUID PRIMARY KEY,
-    id_matricula UUID NOT NULL REFERENCES matricula (id_matricula) ON DELETE RESTRICT,
-    id_seccion UUID NOT NULL REFERENCES seccion (id_seccion) ON DELETE RESTRICT,
-    estado VARCHAR(15) NOT NULL DEFAULT 'ACTIVA' CHECK (estado IN ('ACTIVA', 'RETIRADA', 'APROBADA', 'DESAPROBADA', 'ANULADA')),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_tenant UUID NOT NULL REFERENCES tenants (id) ON DELETE RESTRICT,
+    id_matricula UUID NOT NULL REFERENCES matricula (id) ON DELETE RESTRICT,
+    id_seccion UUID NOT NULL REFERENCES seccion (id) ON DELETE RESTRICT,
+    id_curso UUID NOT NULL REFERENCES curso (id) ON DELETE RESTRICT,
+    estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA'
+        CHECK (estado IN ('ACTIVA', 'RETIRADA', 'APROBADA', 'DESAPROBADA', 'ANULADA')),
+    creditos SMALLINT NOT NULL CHECK (creditos > 0),
     fecha_inscripcion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    fecha_cambio_estado TIMESTAMPTZ,
-    nota_final NUMERIC(5, 2) CHECK (nota_final IS NULL OR (nota_final >= 0 AND nota_final <= 100)),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_inscripcion_seccion UNIQUE (id_matricula, id_seccion)
-);
-
-CREATE TABLE calificacion (
-    id_calificacion UUID PRIMARY KEY,
-    id_inscripcion UUID NOT NULL REFERENCES inscripcion (id_inscripcion) ON DELETE RESTRICT,
-    id_componente UUID NOT NULL REFERENCES componente_evaluacion (id_componente) ON DELETE RESTRICT,
-    valor_nota NUMERIC(5, 2) NOT NULL CHECK (valor_nota >= 0),
-    estado VARCHAR(15) NOT NULL DEFAULT 'BORRADOR' CHECK (estado IN ('BORRADOR', 'PUBLICADO')),
-    fecha_ingreso TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    id_docente_ingreso UUID NOT NULL REFERENCES perfil_docente (id_perfil_docente) ON DELETE RESTRICT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_calificacion_inscripcion_componente UNIQUE (id_inscripcion, id_componente)
-);
-
-CREATE TABLE cuenta_seguimiento_alumno (
-    id_cuenta UUID PRIMARY KEY,
-    id_perfil_alumno UUID NOT NULL REFERENCES perfil_alumno (id_perfil_alumno) ON DELETE RESTRICT,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    tipo_cuenta VARCHAR(40) NOT NULL CHECK (tipo_cuenta IN ('CTA-DESAPROBACIONES', 'CTA-CREDITOS-APROBADOS', 'CTA-CREDITOS-INSCRITOS', 'CTA-RESERVAS-MATRICULA', 'CTA-CONDICION-ACADEMICA', 'CTA-PROMEDIO-SNAPSHOT')),
-    id_periodo_ref UUID REFERENCES periodo_academico (id_periodo) ON DELETE RESTRICT,
-    id_curso_ref UUID REFERENCES curso (id_curso) ON DELETE RESTRICT,
-    valor_actual NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (valor_actual >= 0),
-    fecha_actualizacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_cuenta_seguimiento_unique UNIQUE (id_perfil_alumno, tipo_cuenta, id_periodo_ref, id_curso_ref)
-);
-
-CREATE TABLE evento_academico (
-    id_evento UUID PRIMARY KEY,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    id_tipo_evento UUID NOT NULL REFERENCES tipo_evento (id_tipo_evento) ON DELETE RESTRICT,
-    id_actor UUID NOT NULL REFERENCES usuario (id_usuario) ON DELETE RESTRICT,
-    entidad_afectada_tipo VARCHAR(50) NOT NULL,
-    entidad_afectada_id UUID NOT NULL,
-    fecha_ocurrencia TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    valor_anterior VARCHAR(1000),
-    valor_nuevo VARCHAR(1000),
-    id_evento_ref UUID REFERENCES evento_academico (id_evento) ON DELETE RESTRICT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE correccion_nota (
-    id_correccion UUID PRIMARY KEY,
-    id_calificacion UUID NOT NULL REFERENCES calificacion (id_calificacion) ON DELETE RESTRICT,
-    id_evento_original UUID NOT NULL REFERENCES evento_academico (id_evento) ON DELETE RESTRICT,
-    id_evento_nuevo UUID REFERENCES evento_academico (id_evento) ON DELETE RESTRICT,
-    valor_anterior NUMERIC(5, 2) NOT NULL,
-    valor_nuevo NUMERIC(5, 2) NOT NULL,
-    justificacion VARCHAR(1000) NOT NULL,
-    id_admin_aprobador UUID NOT NULL REFERENCES usuario (id_usuario) ON DELETE RESTRICT,
-    fecha_correccion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT chk_correccion_valores CHECK (valor_anterior <> valor_nuevo)
-);
-
-CREATE TABLE snapshot_promedio (
-    id_snapshot UUID PRIMARY KEY,
-    id_perfil_alumno UUID NOT NULL REFERENCES perfil_alumno (id_perfil_alumno) ON DELETE RESTRICT,
-    id_periodo UUID NOT NULL REFERENCES periodo_academico (id_periodo) ON DELETE RESTRICT,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    pps NUMERIC(5, 2) NOT NULL,
-    ppa NUMERIC(5, 2) NOT NULL,
-    id_formula_aplicada UUID REFERENCES formula_promedio (id) ON DELETE RESTRICT,
-    fecha_generacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    id_snapshot_anterior UUID REFERENCES snapshot_promedio (id_snapshot) ON DELETE RESTRICT,
-    id_evento_correc UUID REFERENCES evento_academico (id_evento) ON DELETE RESTRICT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_snapshot_alumno_periodo_rec UNIQUE (id_perfil_alumno, id_periodo, id_snapshot_anterior)
-);
-
-CREATE TABLE condicion_academica_alumno (
-    id_condicion UUID PRIMARY KEY,
-    id_perfil_alumno UUID NOT NULL REFERENCES perfil_alumno (id_perfil_alumno) ON DELETE RESTRICT,
-    id_tipo_condicion UUID NOT NULL REFERENCES tipo_condicion_academica (id_tipo_condicion) ON DELETE RESTRICT,
-    id_periodo UUID NOT NULL REFERENCES periodo_academico (id_periodo) ON DELETE RESTRICT,
-    id_evento_origen UUID NOT NULL REFERENCES evento_academico (id_evento) ON DELETE RESTRICT,
-    estado VARCHAR(10) NOT NULL DEFAULT 'ACTIVA' CHECK (estado IN ('ACTIVA', 'RESUELTA')),
-    fecha_activacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    fecha_resolucion TIMESTAMPTZ,
-    observaciones VARCHAR(1000),
+    fecha_retiro TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE registro_auditoria (
-    id_registro UUID PRIMARY KEY,
-    id_tenant UUID NOT NULL REFERENCES tenants (id_tenant) ON DELETE RESTRICT,
-    id_usuario UUID NOT NULL REFERENCES usuario (id_usuario) ON DELETE RESTRICT,
-    fecha_hora TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    tipo_operacion VARCHAR(80) NOT NULL,
-    entidad_afectada_tipo VARCHAR(50) NOT NULL,
-    entidad_afectada_id UUID NOT NULL,
-    resultado VARCHAR(15) NOT NULL CHECK (resultado IN ('EXITOSA', 'RECHAZADA')),
-    valor_anterior VARCHAR(1000),
-    valor_nuevo VARCHAR(1000),
-    motivo_rechazo VARCHAR(1000),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE UNIQUE INDEX uq_inscripcion_activa_curso
+    ON inscripcion (id_matricula, id_curso)
+    WHERE estado = 'ACTIVA';
 
--- ==========================================
--- 5. INITIAL SEED DATA
--- ==========================================
+CREATE INDEX idx_inscripcion_matricula ON inscripcion (id_matricula);
+CREATE INDEX idx_inscripcion_seccion ON inscripcion (id_seccion);
 
-INSERT INTO tenants (id, id_tenant, nombre, dominio, zona_horaria)
-VALUES (
-    'a1111111-1111-1111-1111-111111111111',
-    'a1111111-1111-1111-1111-111111111111',
-    'Universidad Demo',
-    'uni-demo',
-    'America/Lima'
-);
+
+-- Supabase híbrido (SQLAlchemy legacy + módulo matrícula Gabriel).
+-- Ejecutar UNA VEZ en el SQL Editor de Supabase para pruebas de integración sin Docker.
+-- Idempotente: CREATE OR REPLACE sobre la función sync_ids existente.
+
+CREATE OR REPLACE FUNCTION public.sync_ids()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+    BEGIN
+        IF TG_TABLE_NAME = 'tenants' THEN
+            IF NEW.id_tenant IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_tenant := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_tenant IS NOT NULL THEN
+                NEW.id := NEW.id_tenant;
+            ELSIF NEW.id_tenant <> NEW.id THEN
+                NEW.id_tenant := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'usuarios' THEN
+            IF NEW.id_usuario IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_usuario := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_usuario IS NOT NULL THEN
+                NEW.id := NEW.id_usuario;
+            ELSIF NEW.id_usuario <> NEW.id THEN
+                NEW.id_usuario := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'periodo_academico' THEN
+            IF NEW.id_periodo IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_periodo := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_periodo IS NOT NULL THEN
+                NEW.id := NEW.id_periodo;
+            ELSIF NEW.id_periodo <> NEW.id THEN
+                NEW.id_periodo := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'plan_estudios' THEN
+            IF NEW.id_plan_estudios IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_plan_estudios := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_plan_estudios IS NOT NULL THEN
+                NEW.id := NEW.id_periodo;
+            ELSIF NEW.id_plan_estudios <> NEW.id THEN
+                NEW.id_plan_estudios := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'curso' THEN
+            IF NEW.id_curso IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_curso := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_curso IS NOT NULL THEN
+                NEW.id := NEW.id_curso;
+            ELSIF NEW.id_curso <> NEW.id THEN
+                NEW.id_curso := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'seccion' THEN
+            IF NEW.id_seccion IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_seccion := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_seccion IS NOT NULL THEN
+                NEW.id := NEW.id_seccion;
+            ELSIF NEW.id_seccion <> NEW.id THEN
+                NEW.id_seccion := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'componente_evaluacion' THEN
+            IF NEW.id_componente IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_componente := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_componente IS NOT NULL THEN
+                NEW.id := NEW.id_componente;
+            ELSIF NEW.id_componente <> NEW.id THEN
+                NEW.id_componente := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'asignacion_docente_seccion' THEN
+            IF NEW.id_asignacion IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_asignacion := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_asignacion IS NOT NULL THEN
+                NEW.id := NEW.id_asignacion;
+            ELSIF NEW.id_asignacion <> NEW.id THEN
+                NEW.id_asignacion := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'matricula' THEN
+            IF NEW.id_matricula IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_matricula := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_matricula IS NOT NULL THEN
+                NEW.id := NEW.id_matricula;
+            ELSIF NEW.id_matricula <> NEW.id THEN
+                NEW.id_matricula := NEW.id;
+            END IF;
+            IF NEW.fecha_registro IS NULL AND NEW.fecha_matricula IS NOT NULL THEN
+                NEW.fecha_registro := NEW.fecha_matricula;
+            ELSIF NEW.fecha_matricula IS NULL AND NEW.fecha_registro IS NOT NULL THEN
+                NEW.fecha_matricula := NEW.fecha_registro;
+            END IF;
+            IF NEW.id_perfil_alumno IS NULL AND NEW.id_alumno IS NOT NULL THEN
+                SELECT pa.id_perfil_alumno INTO NEW.id_perfil_alumno
+                FROM perfil_alumno pa
+                WHERE pa.id_usuario = NEW.id_alumno
+                LIMIT 1;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'inscripcion' THEN
+            IF NEW.id_inscripcion IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_inscripcion := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_inscripcion IS NOT NULL THEN
+                NEW.id := NEW.id_inscripcion;
+            ELSIF NEW.id_inscripcion <> NEW.id THEN
+                NEW.id_inscripcion := NEW.id;
+            END IF;
+        ELSIF TG_TABLE_NAME = 'cuenta_seguimiento_alumno' THEN
+            IF NEW.id_cuenta IS NULL AND NEW.id IS NOT NULL THEN
+                NEW.id_cuenta := NEW.id;
+            ELSIF NEW.id IS NULL AND NEW.id_cuenta IS NOT NULL THEN
+                NEW.id := NEW.id_cuenta;
+            ELSIF NEW.id_cuenta <> NEW.id THEN
+                NEW.id_cuenta := NEW.id;
+            END IF;
+            IF NEW.id_perfil_alumno IS NULL AND NEW.id_alumno IS NOT NULL THEN
+                SELECT pa.id_perfil_alumno INTO NEW.id_perfil_alumno
+                FROM perfil_alumno pa
+                WHERE pa.id_usuario = NEW.id_alumno
+                LIMIT 1;
+            END IF;
+            IF NEW.tipo_cuenta IS NULL THEN
+                NEW.tipo_cuenta := 'CTA-CREDITOS-INSCRITOS';
+            END IF;
+        END IF;
+        RETURN NEW;
+    END;
+    $function$;
 
 
 -- SGA Fase 1: Turnos de Matrícula (Dair Ramos)
@@ -606,7 +507,43 @@ ALTER TABLE matricula
 ADD COLUMN numero_turno INT DEFAULT 1,
 ADD COLUMN fecha_hora_turno TIMESTAMPTZ;
 
--- SGA: Sincronización de Usuarios (Fase 1 'usuarios' a Fase 2 'usuario')
+
+-- Sync existing users from usuarios to usuario
+INSERT INTO public.usuario (
+    id_usuario,
+    id_tenant,
+    nombre_completo,
+    email,
+    password_hash,
+    rol,
+    estado,
+    fecha_registro
+)
+SELECT 
+    u.id,
+    COALESCE(t.id_tenant, 'b387616c-4731-489c-bc4d-84092face20b'),
+    u.nombre || ' ' || u.apellido,
+    u.email,
+    u.password_hash,
+    CASE 
+        WHEN u.rol::text = 'ADMIN_CENTRAL' THEN 'ADMINISTRADOR_CENTRAL'
+        WHEN u.rol::text = 'ADMIN' THEN 'ADMINISTRADOR'
+        ELSE u.rol::text
+    END,
+    CASE WHEN u.activo THEN 'ACTIVO' ELSE 'INACTIVO' END,
+    u.created_at
+FROM public.usuarios u
+LEFT JOIN public.tenants t ON u.id_tenant = t.id
+ON CONFLICT (id_usuario) DO UPDATE SET
+    id_tenant = EXCLUDED.id_tenant,
+    nombre_completo = EXCLUDED.nombre_completo,
+    email = EXCLUDED.email,
+    password_hash = EXCLUDED.password_hash,
+    rol = EXCLUDED.rol,
+    estado = EXCLUDED.estado,
+    updated_at = NOW();
+
+-- Create trigger function to sync changes from usuarios to usuario
 CREATE OR REPLACE FUNCTION public.sync_usuarios_to_usuario_func()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -669,4 +606,174 @@ DROP TRIGGER IF EXISTS trg_sync_usuarios_to_usuario ON public.usuarios;
 CREATE TRIGGER trg_sync_usuarios_to_usuario
 AFTER INSERT OR UPDATE OR DELETE ON public.usuarios
 FOR EACH ROW EXECUTE FUNCTION public.sync_usuarios_to_usuario_func();
+
+
+-- 009_alter_tipo_evento_nullable_and_seed.sql
+-- Alter table tipo_evento to allow nullable values for cuenta_objetivo and operacion
+ALTER TABLE tipo_evento ALTER COLUMN cuenta_objetivo DROP NOT NULL;
+ALTER TABLE tipo_evento ALTER COLUMN operacion DROP NOT NULL;
+
+-- PL/pgSQL block to seed default events for all existing tenants
+DO $$
+DECLARE
+    t RECORD;
+    evt_id UUID;
+BEGIN
+    FOR t IN SELECT id, id_tenant FROM tenants LOOP
+        -- 1. EVT-NOTA-FINAL-CALCULADA
+        IF NOT EXISTS (SELECT 1 FROM cat_tipo_evento WHERE id_tenant = t.id AND codigo = 'EVT-NOTA-FINAL-CALCULADA') THEN
+            evt_id := gen_random_uuid();
+            INSERT INTO cat_tipo_evento (id, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id, 'EVT-NOTA-FINAL-CALCULADA', 'Nota Final Calculada', 'CTA-CREDITOS-APROBADOS', 'INCREMENTO');
+            INSERT INTO tipo_evento (id_tipo_evento, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id_tenant, 'EVT-NOTA-FINAL-CALCULADA', 'Nota Final Calculada', 'CTA-CREDITOS-APROBADOS', 'INCREMENTO');
+        END IF;
+
+        -- 2. EVT-REPROBO-CURSO
+        IF NOT EXISTS (SELECT 1 FROM cat_tipo_evento WHERE id_tenant = t.id AND codigo = 'EVT-REPROBO-CURSO') THEN
+            evt_id := gen_random_uuid();
+            INSERT INTO cat_tipo_evento (id, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id, 'EVT-REPROBO-CURSO', 'Reprobó Curso', 'CTA-DESAPROBACIONES', 'INCREMENTO');
+            INSERT INTO tipo_evento (id_tipo_evento, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id_tenant, 'EVT-REPROBO-CURSO', 'Reprobó Curso', 'CTA-DESAPROBACIONES', 'INCREMENTO');
+        END IF;
+
+        -- 3. EVT-SNAPSHOT-PROMEDIO
+        IF NOT EXISTS (SELECT 1 FROM cat_tipo_evento WHERE id_tenant = t.id AND codigo = 'EVT-SNAPSHOT-PROMEDIO') THEN
+            evt_id := gen_random_uuid();
+            INSERT INTO cat_tipo_evento (id, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id, 'EVT-SNAPSHOT-PROMEDIO', 'Snapshot de Promedio Semestral/Acumulado', 'CTA-PROMEDIO-SNAPSHOT', 'ASIGNACION');
+            INSERT INTO tipo_evento (id_tipo_evento, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id_tenant, 'EVT-SNAPSHOT-PROMEDIO', 'Snapshot de Promedio Semestral/Acumulado', 'CTA-PROMEDIO-SNAPSHOT', 'ASIGNACION');
+        END IF;
+
+        -- 4. EVT-CONDICION-ACTIVADA
+        IF NOT EXISTS (SELECT 1 FROM cat_tipo_evento WHERE id_tenant = t.id AND codigo = 'EVT-CONDICION-ACTIVADA') THEN
+            evt_id := gen_random_uuid();
+            INSERT INTO cat_tipo_evento (id, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id, 'EVT-CONDICION-ACTIVADA', 'Condición Académica Activada', NULL, NULL);
+            INSERT INTO tipo_evento (id_tipo_evento, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id_tenant, 'EVT-CONDICION-ACTIVADA', 'Condición Académica Activada', NULL, NULL);
+        END IF;
+
+        -- 5. EVT-CONDICION-RESUELTA
+        IF NOT EXISTS (SELECT 1 FROM cat_tipo_evento WHERE id_tenant = t.id AND codigo = 'EVT-CONDICION-RESUELTA') THEN
+            evt_id := gen_random_uuid();
+            INSERT INTO cat_tipo_evento (id, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id, 'EVT-CONDICION-RESUELTA', 'Condición Académica Resuelta', NULL, NULL);
+            INSERT INTO tipo_evento (id_tipo_evento, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id_tenant, 'EVT-CONDICION-RESUELTA', 'Condición Académica Resuelta', NULL, NULL);
+        END IF;
+
+        -- 6. EVT-NOTA-CORREGIDA
+        IF NOT EXISTS (SELECT 1 FROM cat_tipo_evento WHERE id_tenant = t.id AND codigo = 'EVT-NOTA-CORREGIDA') THEN
+            evt_id := gen_random_uuid();
+            INSERT INTO cat_tipo_evento (id, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id, 'EVT-NOTA-CORREGIDA', 'Nota Corregida por Docente', 'CTA-CREDITOS-APROBADOS', 'INCREMENTO');
+            INSERT INTO tipo_evento (id_tipo_evento, id_tenant, codigo, nombre, cuenta_objetivo, operacion)
+            VALUES (evt_id, t.id_tenant, 'EVT-NOTA-CORREGIDA', 'Nota Corregida por Docente', 'CTA-CREDITOS-APROBADOS', 'INCREMENTO');
+        END IF;
+    END LOOP;
+END $$;
+
+
+-- 010_rename_componente_to_evaluacion.sql
+
+-- 1. Rename table cat_tipo_componente to cat_tipo_evaluacion
+ALTER TABLE cat_tipo_componente RENAME TO cat_tipo_evaluacion;
+
+-- 2. Rename table tipo_componente to tipo_evaluacion
+ALTER TABLE tipo_componente RENAME TO tipo_evaluacion;
+ALTER TABLE tipo_evaluacion RENAME COLUMN id_tipo_componente TO id_tipo_evaluacion;
+ALTER TABLE tipo_evaluacion RENAME CONSTRAINT uq_tipo_componente_codigo TO uq_tipo_evaluacion_codigo;
+
+-- 3. Rename columns and constraints in asignacion_docente_seccion
+ALTER TABLE asignacion_docente_seccion RENAME COLUMN id_tipo_componente TO id_tipo_evaluacion;
+ALTER TABLE asignacion_docente_seccion RENAME CONSTRAINT uq_asignacion_docente_componente TO uq_asignacion_docente_evaluacion;
+
+-- 4. Rename table componente_evaluacion to evaluacion_academica
+ALTER TABLE componente_evaluacion RENAME TO evaluacion_academica;
+ALTER TABLE evaluacion_academica RENAME COLUMN id_componente TO id_evaluacion;
+ALTER TABLE evaluacion_academica RENAME COLUMN id_tipo_componente TO id_tipo_evaluacion;
+ALTER TABLE evaluacion_academica RENAME CONSTRAINT componente_evaluacion_peso_relativo_check TO evaluacion_academica_peso_relativo_check;
+ALTER TABLE evaluacion_academica RENAME CONSTRAINT componente_evaluacion_estado_check TO evaluacion_academica_estado_check;
+
+-- 5. Rename columns and constraints in calificacion
+ALTER TABLE calificacion RENAME COLUMN id_componente TO id_evaluacion;
+ALTER TABLE calificacion RENAME CONSTRAINT uq_calificacion_inscripcion_componente TO uq_calificacion_inscripcion_evaluacion;
+
+-- 6. Drop the old trigger and recreate the new sync trigger for evaluacion_academica
+DROP TRIGGER IF EXISTS trg_sync_componente ON evaluacion_academica;
+CREATE TRIGGER trg_sync_evaluacion BEFORE INSERT OR UPDATE ON evaluacion_academica FOR EACH ROW EXECUTE FUNCTION sync_ids();
+
+-- 7. Update the sync_ids trigger function to handle 'evaluacion_academica' instead of 'componente_evaluacion'
+CREATE OR REPLACE FUNCTION sync_ids()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_TABLE_NAME = 'tenants' THEN
+        IF NEW.id_tenant IS NULL AND NEW.id IS NOT NULL THEN
+            NEW.id_tenant := NEW.id;
+        ELSIF NEW.id IS NULL AND NEW.id_tenant IS NOT NULL THEN
+            NEW.id := NEW.id_tenant;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'periodo_academico' THEN
+        IF NEW.id_periodo IS NULL AND NEW.id IS NOT NULL THEN
+            NEW.id_periodo := NEW.id;
+        ELSIF NEW.id IS NULL AND NEW.id_periodo IS NOT NULL THEN
+            NEW.id := NEW.id_periodo;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'plan_estudios' THEN
+        IF NEW.id_plan_estudios IS NULL AND NEW.id IS NOT NULL THEN
+            NEW.id_plan_estudios := NEW.id;
+        ELSIF NEW.id IS NULL AND NEW.id_plan_estudios IS NOT NULL THEN
+            NEW.id := NEW.id_plan_estudios;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'curso' THEN
+        IF NEW.id_curso IS NULL AND NEW.id IS NOT NULL THEN
+            NEW.id_curso := NEW.id;
+        ELSIF NEW.id IS NULL AND NEW.id_curso IS NOT NULL THEN
+            NEW.id := NEW.id_curso;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'seccion' THEN
+        IF NEW.id_seccion IS NULL AND NEW.id IS NOT NULL THEN
+            NEW.id_seccion := NEW.id;
+        ELSIF NEW.id IS NULL AND NEW.id_seccion IS NOT NULL THEN
+            NEW.id := NEW.id_seccion;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'evaluacion_academica' THEN
+        IF NEW.id_evaluacion IS NULL AND NEW.id IS NOT NULL THEN
+            NEW.id_evaluacion := NEW.id;
+        ELSIF NEW.id IS NULL AND NEW.id_evaluacion IS NOT NULL THEN
+            NEW.id := NEW.id_evaluacion;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'asignacion_docente_seccion' THEN
+        IF NEW.id_asignacion IS NULL AND NEW.id IS NOT NULL THEN
+            NEW.id_asignacion := NEW.id;
+        ELSIF NEW.id IS NULL AND NEW.id_asignacion IS NOT NULL THEN
+            NEW.id := NEW.id_asignacion;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- 011_curso_evaluacion_config.sql
+-- Tabla que almacena la plantilla de evaluaciones y sus pesos para cada curso.
+-- Esta configuración define cómo se calcula la nota final de ese curso:
+--   nota_final = SUM(nota * peso) / SUM(pesos)
+
+CREATE TABLE IF NOT EXISTS curso_evaluacion_config (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id_curso        UUID NOT NULL REFERENCES curso(id) ON DELETE CASCADE,
+    id_tipo_evaluacion UUID NOT NULL REFERENCES tipo_evaluacion(id_tipo_evaluacion) ON DELETE RESTRICT,
+    peso            NUMERIC(7, 4) NOT NULL CHECK (peso > 0),
+    orden           INTEGER NOT NULL DEFAULT 1,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_curso_tipo_evaluacion UNIQUE (id_curso, id_tipo_evaluacion)
+);
+
+-- Índice para búsquedas frecuentes por curso
+CREATE INDEX IF NOT EXISTS idx_curso_eval_config_curso ON curso_evaluacion_config(id_curso);
+
 

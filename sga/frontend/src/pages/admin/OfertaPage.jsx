@@ -6,6 +6,8 @@ import Badge from '../../components/Badge'
 import ErrorAlert, { SuccessAlert } from '../../components/ErrorAlert'
 import { ofertaService } from '../../services/ofertaService'
 import { periodoService } from '../../services/periodoService'
+import { userService } from '../../services/userService'
+
 
 const TABS = ['Planes de Estudio', 'Cursos', 'Secciones']
 
@@ -48,6 +50,11 @@ export default function OfertaPage() {
   // Estado para la configuración de evaluaciones del curso
   const [tiposEvaluacion, setTiposEvaluacion] = useState([])
   const [evalConfig, setEvalConfig] = useState({}) // { [id_tipo_evaluacion]: { checked, peso } }
+
+  // Estados para asignación de docentes al crear sección
+  const [docentesOptions, setDocentesOptions] = useState([])
+  const [seccionDocentes, setSeccionDocentes] = useState({}) // { [id_tipo_evaluacion]: { id_usuario_docente, es_coordinador } }
+
 
   const sumaPesos = Object.values(evalConfig)
     .filter(v => v.checked)
@@ -105,9 +112,18 @@ export default function OfertaPage() {
     setForm({})
     setSelectedPrereqs([])
     setEvalConfig({})
+    setSeccionDocentes({})
     setShowModal(true)
     if (type === 'curso') {
       await loadTiposEvaluacion()
+    } else if (type === 'seccion') {
+      try {
+        const users = await userService.listar()
+        const docentes = users.filter(u => u.rol === 'DOCENTE')
+        setDocentesOptions(docentes)
+      } catch (e) {
+        setError('Error al cargar la lista de docentes: ' + (e.response?.data?.detail || e.message))
+      }
     }
   }
 
@@ -135,6 +151,22 @@ export default function OfertaPage() {
       return next
     })
   }
+
+  const handleCursoChange = (cursoId) => {
+    setForm(prev => ({ ...prev, id_curso: cursoId }))
+    setSeccionDocentes({})
+    if (!cursoId) return
+
+    const selectedCurso = cursos.find(c => c.id === cursoId)
+    if (selectedCurso && selectedCurso.evaluaciones_config) {
+      const init = {}
+      selectedCurso.evaluaciones_config.forEach(cfg => {
+        init[cfg.id_tipo_evaluacion] = { id_usuario_docente: '', es_coordinador: false }
+      })
+      setSeccionDocentes(init)
+    }
+  }
+
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -170,9 +202,22 @@ export default function OfertaPage() {
         })
         setSuccess('Curso creado')
       } else if (modalType === 'seccion') {
-        await ofertaService.crearSeccion({ ...form, id_periodo: selectedPeriodo })
+        const docentes = Object.entries(seccionDocentes)
+          .filter(([_, d]) => d.id_usuario_docente)
+          .map(([id_tipo_evaluacion, d]) => ({
+            id_tipo_evaluacion,
+            id_usuario_docente: d.id_usuario_docente,
+            es_coordinador: !!d.es_coordinador,
+          }))
+
+        await ofertaService.crearSeccion({
+          ...form,
+          id_periodo: selectedPeriodo,
+          docentes,
+        })
         setSuccess('Sección creada')
       }
+
       setShowModal(false)
       load()
     } catch (e) {
@@ -268,11 +313,13 @@ export default function OfertaPage() {
   ]
 
   const seccionesColumns = [
+    { accessor: 'codigo_curso', header: 'Curso' },
     { accessor: 'codigo_seccion', header: 'Código Sección', primary: true },
     { key: 'estado', header: 'Estado', render: r => <Badge value={r.estado} dot /> },
     { accessor: 'vacantes_maximas', header: 'Vacantes Máx.' },
     { accessor: 'vacantes_disponibles', header: 'Disponibles' },
   ]
+
 
   const sumColor = sumaPesos === 0 ? '#a0aec0'
     : Math.abs(sumaPesos - 100) < 0.01 ? '#38a169'
@@ -752,7 +799,7 @@ export default function OfertaPage() {
               <>
                 <div className="form-group">
                   <label className="form-label" htmlFor="sec-curso">Seleccionar Curso</label>
-                  <select id="sec-curso" className="form-select" value={form.id_curso || ''} onChange={e => setForm({ ...form, id_curso: e.target.value })}>
+                  <select id="sec-curso" className="form-select" value={form.id_curso || ''} onChange={e => handleCursoChange(e.target.value)}>
                     <option value="">Selecciona un curso...</option>
                     {cursos.map(c => <option key={c.id} value={c.id}>{c.codigo_curso} — {c.nombre_curso}</option>)}
                   </select>
@@ -767,8 +814,89 @@ export default function OfertaPage() {
                     <input id="sec-vacantes" type="number" className="form-input" value={form.vacantes_maximas || ''} onChange={e => setForm({ ...form, vacantes_maximas: parseInt(e.target.value) })} required />
                   </div>
                 </div>
+
+                {/* Asignación de Docentes por Evaluación */}
+                {form.id_curso && (
+                  <div className="form-group">
+                    <label className="form-label" style={{ marginBottom: 8, display: 'block' }}>
+                      Asignación de Docentes por Evaluación
+                    </label>
+                    <div style={{
+                      border: '1px solid var(--border-color, #e2e8f0)',
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      background: 'var(--bg-body, #ffffff)',
+                    }}>
+                      {(!cursos.find(c => c.id === form.id_curso)?.evaluaciones_config || 
+                        cursos.find(c => c.id === form.id_curso).evaluaciones_config.length === 0) ? (
+                        <p style={{ padding: '12px 16px', margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                          Este curso no tiene evaluaciones configuradas. No se pueden asignar docentes.
+                        </p>
+                      ) : (
+                        cursos.find(c => c.id === form.id_curso).evaluaciones_config.map((cfg, idx) => {
+                          const assignment = seccionDocentes[cfg.id_tipo_evaluacion] || { id_usuario_docente: '', es_coordinador: false }
+                          return (
+                            <div
+                              key={cfg.id_tipo_evaluacion}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 16,
+                                padding: '10px 14px',
+                                background: assignment.id_usuario_docente ? 'rgba(99,102,241,0.04)' : 'transparent',
+                                borderBottom: idx < cursos.find(c => c.id === form.id_curso).evaluaciones_config.length - 1 ? '1px solid var(--border-color, #edf2f7)' : 'none',
+                                transition: 'background 0.15s',
+                              }}
+                            >
+                              <div style={{ flex: 1, minWidth: 140 }}>
+                                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-color)' }}>{cfg.nombre_tipo_evaluacion || 'Evaluación'}</span>
+                                <span style={{ marginLeft: 6, fontSize: '0.75rem', color: 'var(--text-muted)' }}>({cfg.peso}%)</span>
+                              </div>
+                              
+                              <select
+                                className="form-select"
+                                style={{ flex: 2, padding: '4px 8px', fontSize: '0.875rem', height: '34px' }}
+                                value={assignment.id_usuario_docente}
+                                onChange={e => {
+                                  const val = e.target.value
+                                  setSeccionDocentes(prev => ({
+                                    ...prev,
+                                    [cfg.id_tipo_evaluacion]: { ...prev[cfg.id_tipo_evaluacion], id_usuario_docente: val }
+                                  }))
+                                }}
+                              >
+                                <option value="">Asignar docente...</option>
+                                {docentesOptions.map(d => (
+                                  <option key={d.id} value={d.id}>{d.apellido}, {d.nombre}</option>
+                                ))}
+                              </select>
+
+                              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: '0.8125rem', whiteSpace: 'nowrap', userSelect: 'none', color: assignment.id_usuario_docente ? 'var(--text-color)' : 'var(--text-muted)' }}>
+                                <input
+                                  type="checkbox"
+                                  disabled={!assignment.id_usuario_docente}
+                                  checked={assignment.es_coordinador}
+                                  onChange={e => {
+                                    const val = e.target.checked
+                                    setSeccionDocentes(prev => ({
+                                      ...prev,
+                                      [cfg.id_tipo_evaluacion]: { ...prev[cfg.id_tipo_evaluacion], es_coordinador: val }
+                                    }))
+                                  }}
+                                  style={{ width: 14, height: 14, accentColor: 'var(--primary, #6366f1)' }}
+                                />
+                                Coordinador
+                              </label>
+                            </div>
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </>
             )}
+
           </Modal>
         )}
 

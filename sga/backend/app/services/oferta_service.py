@@ -185,12 +185,19 @@ class OfertaService:
                 # Insertar configuración de evaluaciones si viene en el payload
                 eval_config_rows = []
                 for idx, item in enumerate(payload.evaluaciones_config):
-                    # Verificar que el tipo de evaluación pertenece al tenant
                     tipo_exists = await conn.fetchval(
-                        "SELECT EXISTS(SELECT 1 FROM tipo_evaluacion WHERE id_tipo_evaluacion = $1 AND id_tenant = $2)",
+                        """
+                        SELECT EXISTS(
+                            SELECT 1 
+                            FROM tipo_evaluacion te
+                            JOIN tenants t ON te.id_tenant = t.id_tenant
+                            WHERE te.id_tipo_evaluacion = $1 AND t.id = $2
+                        )
+                        """,
                         item.id_tipo_evaluacion,
                         tenant_id,
                     )
+
                     if not tipo_exists:
                         raise NotFoundError(
                             f"Tipo de evaluación con ID {item.id_tipo_evaluacion} no encontrado en este tenant."
@@ -500,6 +507,24 @@ class OfertaService:
                             id_curso=payload.id_curso,
                             id_escala_default=escala["id"],
                         )
+
+                # Asignar profesores si se especificaron
+                for d in payload.docentes:
+                    docente = await self.repo.get_docente_by_id_and_tenant(d.id_usuario_docente, tenant_id)
+                    if docente is None:
+                        raise NotFoundError(f"El docente con ID {d.id_usuario_docente} no existe o no pertenece a esta institución.")
+
+                    await conn.execute(
+                        """
+                        INSERT INTO asignacion_docente_seccion (id_seccion, id_usuario_docente, id_tipo_evaluacion, es_coordinador)
+                        VALUES ($1, $2, $3, $4)
+                        ON CONFLICT DO NOTHING
+                        """,
+                        row["id"],
+                        d.id_usuario_docente,
+                        d.id_tipo_evaluacion,
+                        d.es_coordinador,
+                    )
 
                 await self.audit_repo.registrar(
                     conn,
