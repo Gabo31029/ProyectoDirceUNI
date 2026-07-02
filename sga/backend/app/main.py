@@ -48,9 +48,19 @@ async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=status_code, content={"detail": exc.message})
 
 
+# Import all models so that Base.metadata registers all tables
+from app.models import core_schemas, calificacion, cierre, seguimiento   # noqa: F401
+
+from app.api.calificaciones import router as calificaciones_router
+from app.api.cierre import router as cierre_router
+from app.api.historial import router as historial_router
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+app.include_router(calificaciones_router, prefix="/api/v1")
+app.include_router(cierre_router, prefix="/api/v1")
+app.include_router(historial_router, prefix="/api/v1")
 app.include_router(api_router)

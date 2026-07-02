@@ -182,7 +182,7 @@ class TestDatabaseModels:
     def test_create_tenant(self, db_session):
         tenant = Tenant(
             id_tenant="t-1",
-            nombre_institucional="Universidad Nacional",
+            nombre="Universidad Nacional",
             dominio="uni.edu.pe",
             zona_horaria="America/Lima"
         )
@@ -193,7 +193,7 @@ class TestDatabaseModels:
         assert fetched.dominio == "uni.edu.pe"
 
     def test_create_escala_evaluacion(self, db_session):
-        tenant = Tenant(id_tenant="t-2", nombre_institucional="UNIV 2",
+        tenant = Tenant(id_tenant="t-2", nombre="UNIV 2",
                         dominio="univ2.edu.pe", zona_horaria="America/Lima")
         db_session.add(tenant)
         db_session.flush()
