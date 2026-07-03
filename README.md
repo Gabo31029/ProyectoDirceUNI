@@ -1,5 +1,5 @@
 ﻿# ProyectoDirce
-## NOTA: ENTREGABLE 3 Y CODIGO ESTA EN LA RAMA DEV
+## NOTA: TRABAJO/CODIGO FINAL COMPLETO FUNCIONAL y ENTREGABLE 3 EN LA RAMA DEV
 ## Descripción
 Nuestro sistema Dirce es una plataforma orientada a la administración integral de procesos académicos institucionales. Permite gestionar períodos académicos, matrícula, calificaciones, historial académico, reportes y políticas académicas bajo un enfoque multiinstitucional con trazabilidad y control de acceso por roles.
 
